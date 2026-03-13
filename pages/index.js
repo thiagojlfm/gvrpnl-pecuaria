@@ -115,29 +115,40 @@ function ChatPanel({ anuncio, user, token, onClose }) {
   const [msgs, setMsgs] = useState([])
   const [txt, setTxt] = useState('')
   const [lastId, setLastId] = useState(0)
+  const lastIdRef = useRef(0)
   const bottomRef = useRef(null)
 
   const fetchMsgs = useCallback(async (since = 0) => {
     if (!anuncio?.id) return
-    const h = token ? { Authorization: `Bearer ${token}` } : {}
-    const r = await fetch(`/api/chat?anuncio_id=${anuncio.id}&since=${since}`, { headers: h })
-    const data = await r.json()
-    if (data?.length) {
-      setMsgs(prev => {
-        const ids = new Set(prev.map(m => m.id))
-        const novos = data.filter(m => !ids.has(m.id))
-        const merged = [...prev, ...novos]
-        setLastId(merged[merged.length - 1]?.id || 0)
-        return merged
-      })
-    }
+    try {
+      const h = { 'Content-Type': 'application/json' }
+      if (token) h['Authorization'] = `Bearer ${token}`
+      const r = await fetch(`/api/chat?anuncio_id=${anuncio.id}&since=${since}`, { headers: h })
+      if (!r.ok) return
+      const data = await r.json()
+      if (Array.isArray(data) && data.length) {
+        setMsgs(prev => {
+          const ids = new Set(prev.map(m => m.id))
+          const novos = data.filter(m => !ids.has(m.id))
+          if (!novos.length) return prev
+          const merged = [...prev, ...novos]
+          const newLastId = merged[merged.length - 1]?.id || 0
+          lastIdRef.current = newLastId
+          setLastId(newLastId)
+          return merged
+        })
+      }
+    } catch(e) { console.error('chat fetch error', e) }
   }, [anuncio?.id, token])
 
   useEffect(() => {
+    lastIdRef.current = 0
+    setLastId(0)
+    setMsgs([])
     fetchMsgs(0)
-    const iv = setInterval(() => fetchMsgs(lastId), 3000)
+    const iv = setInterval(() => fetchMsgs(lastIdRef.current), 3000)
     return () => clearInterval(iv)
-  }, [fetchMsgs, lastId])
+  }, [fetchMsgs])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs])
 
@@ -146,7 +157,7 @@ function ChatPanel({ anuncio, user, token, onClose }) {
     const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
     await fetch('/api/chat', { method: 'POST', headers: h, body: JSON.stringify({ anuncio_id: anuncio.id, mensagem: txt.trim() }) })
     setTxt('')
-    fetchMsgs(lastId)
+    fetchMsgs(lastIdRef.current)
   }
 
   async function deletMsg(id) {
@@ -488,7 +499,7 @@ export default function App() {
                 </Card>
                 <Card>
                   <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 14 }}>Rebanho por fase</div>
-                  {['bezerro','garrote','boi','abatido'].map(f => {
+                  {['bezerro','garrote','boi'].map(f => {
                     const qty = mercado?.rebanho?.[f]||0
                     return <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                       <span style={{ color: C.textMuted, fontSize: 12, minWidth: 80, fontWeight: 500 }}>{FASES[f]}</span>
@@ -656,7 +667,7 @@ export default function App() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
                       <Sel label="Lote" value={nAnuncio.lote_id} onChange={e=>setNAnuncio(f=>({...f,lote_id:e.target.value}))}>
                         <option value="">Selecione...</option>
-                        {meusLotes.filter(l=>l.status==='ativo'&&l.fase!=='bezerro').map(l=><option key={l.id} value={l.id}>{l.codigo} — {FASES[l.fase]} ({l.quantidade} cab.)</option>)}
+                        {meusLotes.filter(l=>l.status==='ativo'&&l.fase!=='bezerro'&&l.fase!=='abatido').map(l=><option key={l.id} value={l.id}>{l.codigo} — {FASES[l.fase]} ({l.quantidade} cab.)</option>)}
                       </Sel>
                       <Inp label="Preço ($)" type="number" value={nAnuncio.preco_pedido} onChange={e=>setNAnuncio(f=>({...f,preco_pedido:e.target.value}))} placeholder="1800" />
                       <Inp label="Obs" value={nAnuncio.obs} onChange={e=>setNAnuncio(f=>({...f,obs:e.target.value}))} placeholder="Negociável..." style={{gridColumn:'1/-1'}} />
