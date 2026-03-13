@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     precoRacao,
     racaoPorCabeca,
     custoRacao,
-    bezerro: 900,
+    bezerro: 1100,
     garrote: Math.round(400 * precoKg),
     boi: Math.round(540 * precoKg),
     abate: Math.round(540 * precoKg * 1.2),
