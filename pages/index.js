@@ -150,6 +150,24 @@ export default function Home() {
 
   const notify = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000) }
 
+  const [registerForm, setRegisterForm] = useState({ username: '', password: '', fazenda: '' })
+  const [registerError, setRegisterError] = useState('')
+  const [registerOk, setRegisterOk] = useState(false)
+
+  async function register() {
+    setRegisterError('')
+    const r = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(registerForm) })
+    const d = await r.json()
+    if (d.error) return setRegisterError(d.error)
+    setRegisterOk(true)
+  }
+
+  async function aprovarUsuario(id, status) {
+    await api('/api/admin/usuarios', { method: 'PATCH', body: JSON.stringify({ id, status }) })
+    notify(status === 'aprovado' ? 'Jogador aprovado!' : 'Jogador recusado.')
+    api('/api/admin/usuarios').then(setUsuarios)
+  }
+
   async function login() {
     setLoginError('')
     const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(loginForm) })
@@ -276,21 +294,85 @@ export default function Home() {
           {/* LOGIN */}
           {page === 'login' && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
-              <div style={{ background: '#111', border: '1px solid #222', borderRadius: 12, padding: 32, width: 320 }}>
+              <div style={{ background: '#111', border: '1px solid #222', borderRadius: 12, padding: 32, width: 340 }}>
                 <div style={{ textAlign: 'center', marginBottom: 24 }}>
                   <div style={{ width: 48, height: 48, borderRadius: 12, background: '#1a3d1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, margin: '0 auto 10px' }}>🐄</div>
                   <div style={{ fontSize: 18, fontWeight: 500, color: '#fff', marginBottom: 4 }}>GVRPNL</div>
                   <div style={{ fontSize: 13, color: '#555' }}>Sistema de Pecuária</div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-                  <Input label="USUÁRIO" value={loginForm.username} onChange={e => setLoginForm(f => ({ ...f, username: e.target.value }))} placeholder="seu_usuario" />
-                  <Input label="SENHA" type="password" value={loginForm.password} onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))} placeholder="••••••" onKeyDown={e => e.key === 'Enter' && login()} />
-                </div>
-                {loginError && <div style={{ color: '#f56565', fontSize: 13, marginBottom: 12 }}>{loginError}</div>}
-                <Btn onClick={login} style={{ width: '100%', padding: 10, fontSize: 14 }}>Entrar</Btn>
+                {!registerOk ? (
+                  <>
+                    <div style={{ display: 'flex', gap: 0, marginBottom: 20, background: '#0d0d0d', borderRadius: 8, padding: 3 }}>
+                      <button onClick={() => setRegisterError('') || setRegisterForm({username:'',password:'',fazenda:''})} style={{ flex: 1, background: page !== 'cadastro' ? '#1a3d1a' : 'transparent', border: 'none', color: page !== 'cadastro' ? '#6fcf6f' : '#555', fontSize: 13, padding: '6px 0', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setPage('login')}>Entrar</button>
+                      <button style={{ flex: 1, background: page === 'cadastro' ? '#1a3d1a' : 'transparent', border: 'none', color: page === 'cadastro' ? '#6fcf6f' : '#555', fontSize: 13, padding: '6px 0', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setPage('cadastro')}>Cadastrar</button>
+                    </div>
+                    {page !== 'cadastro' ? (
+                      <>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+                          <Input label="USUÁRIO" value={loginForm.username} onChange={e => setLoginForm(f => ({ ...f, username: e.target.value }))} placeholder="seu_usuario" />
+                          <Input label="SENHA" type="password" value={loginForm.password} onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))} placeholder="••••••" onKeyDown={e => e.key === 'Enter' && login()} />
+                        </div>
+                        {loginError && <div style={{ color: '#f56565', fontSize: 13, marginBottom: 12 }}>{loginError}</div>}
+                        <Btn onClick={login} style={{ width: '100%', padding: 10, fontSize: 14 }}>Entrar</Btn>
+                        <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: '#555' }}>Não tem conta? <span style={{ color: '#6fcf6f', cursor: 'pointer' }} onClick={() => setPage('cadastro')}>Cadastre-se</span></div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+                          <Input label="USUÁRIO" value={registerForm.username} onChange={e => setRegisterForm(f => ({ ...f, username: e.target.value }))} placeholder="seu_usuario" />
+                          <Input label="SENHA" type="password" value={registerForm.password} onChange={e => setRegisterForm(f => ({ ...f, password: e.target.value }))} placeholder="mínimo 6 caracteres" />
+                          <Input label="FAZENDA (opcional)" value={registerForm.fazenda} onChange={e => setRegisterForm(f => ({ ...f, fazenda: e.target.value }))} placeholder="Ex: 0325" />
+                        </div>
+                        {registerError && <div style={{ color: '#f56565', fontSize: 13, marginBottom: 12 }}>{registerError}</div>}
+                        <Btn onClick={register} style={{ width: '100%', padding: 10, fontSize: 14 }}>Solicitar cadastro</Btn>
+                        <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: '#555' }}>Já tem conta? <span style={{ color: '#6fcf6f', cursor: 'pointer' }} onClick={() => setPage('login')}>Entrar</span></div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
+                    <div style={{ fontSize: 15, color: '#6fcf6f', fontWeight: 500, marginBottom: 8 }}>Cadastro enviado!</div>
+                    <div style={{ fontSize: 13, color: '#555' }}>Aguarde o admin aprovar sua conta. Quando aprovado, volte aqui e faça login.</div>
+                    <Btn variant="ghost" onClick={() => { setRegisterOk(false); setPage('login') }} style={{ marginTop: 16, width: '100%' }}>Voltar ao login</Btn>
+                  </div>
+                )}
               </div>
             </div>
           )}
+
+          {/* CADASTRO redirect */}
+          {page === 'cadastro' && !user && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+              <div style={{ background: '#111', border: '1px solid #222', borderRadius: 12, padding: 32, width: 340 }}>
+                <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: '#1a3d1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, margin: '0 auto 10px' }}>🐄</div>
+                  <div style={{ fontSize: 18, fontWeight: 500, color: '#fff', marginBottom: 4 }}>Criar conta</div>
+                  <div style={{ fontSize: 13, color: '#555' }}>O admin irá aprovar seu cadastro</div>
+                </div>
+                {!registerOk ? (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+                      <Input label="USUÁRIO" value={registerForm.username} onChange={e => setRegisterForm(f => ({ ...f, username: e.target.value }))} placeholder="seu_usuario" />
+                      <Input label="SENHA" type="password" value={registerForm.password} onChange={e => setRegisterForm(f => ({ ...f, password: e.target.value }))} placeholder="mínimo 6 caracteres" />
+                      <Input label="FAZENDA (opcional)" value={registerForm.fazenda} onChange={e => setRegisterForm(f => ({ ...f, fazenda: e.target.value }))} placeholder="Ex: 0325" />
+                    </div>
+                    {registerError && <div style={{ color: '#f56565', fontSize: 13, marginBottom: 12 }}>{registerError}</div>}
+                    <Btn onClick={register} style={{ width: '100%', padding: 10, fontSize: 14 }}>Solicitar cadastro</Btn>
+                    <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: '#555' }}>Já tem conta? <span style={{ color: '#6fcf6f', cursor: 'pointer' }} onClick={() => setPage('login')}>Entrar</span></div>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
+                    <div style={{ fontSize: 15, color: '#6fcf6f', fontWeight: 500, marginBottom: 8 }}>Cadastro enviado!</div>
+                    <div style={{ fontSize: 13, color: '#555' }}>Aguarde o admin aprovar sua conta.</div>
+                    <Btn variant="ghost" onClick={() => { setRegisterOk(false); setPage('login') }} style={{ marginTop: 16, width: '100%' }}>Ir para login</Btn>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
 
           {/* MERCADO */}
           {page === 'mercado' && (
@@ -530,6 +612,24 @@ export default function Home() {
               </Card>
 
               <Card>
+                <div style={{ fontSize: 14, fontWeight: 500, color: '#fff', marginBottom: 6 }}>Cadastros pendentes</div>
+                <div style={{ fontSize: 12, color: '#555', marginBottom: 12 }}>Jogadores que solicitaram acesso e aguardam aprovação.</div>
+                {usuarios.filter(u => u.status === 'pendente').length === 0
+                  ? <div style={{ fontSize: 13, color: '#444', padding: '10px 0' }}>Nenhum cadastro pendente.</div>
+                  : <Tbl
+                      headers={['Usuário', 'Fazenda', 'Solicitado em', 'Aprovar', 'Recusar']}
+                      rows={usuarios.filter(u => u.status === 'pendente').map(u => [
+                        <span style={{ fontWeight: 500, color: '#fff' }}>{u.username}</span>,
+                        u.fazenda || '—',
+                        new Date(u.criado_em).toLocaleDateString('pt-BR'),
+                        <Btn onClick={() => aprovarUsuario(u.id, 'aprovado')} style={{ padding: '4px 10px', fontSize: 11 }}>Aprovar</Btn>,
+                        <Btn variant="danger" onClick={() => aprovarUsuario(u.id, 'recusado')} style={{ padding: '4px 10px', fontSize: 11 }}>Recusar</Btn>
+                      ])}
+                    />
+                }
+              </Card>
+
+              <Card>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#fff', marginBottom: 12 }}>Gerenciar jogadores</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 10, marginBottom: 14, alignItems: 'end' }}>
                   <Input label="USUÁRIO" value={novoUsuario.username} onChange={e => setNovoUsuario(f => ({ ...f, username: e.target.value }))} placeholder="nome_jogador" />
@@ -538,11 +638,12 @@ export default function Home() {
                   <Btn onClick={criarUsuario} style={{ padding: '8px 14px' }}>Criar</Btn>
                 </div>
                 <Tbl
-                  headers={['Usuário', 'Fazenda', 'Role', 'Criado em', 'Ação']}
-                  rows={usuarios.map(u => [
+                  headers={['Usuário', 'Fazenda', 'Role', 'Status', 'Criado em', 'Ação']}
+                  rows={usuarios.filter(u => u.status !== 'pendente').map(u => [
                     <span style={{ fontWeight: 500, color: '#fff' }}>{u.username}</span>,
                     u.fazenda || '—',
                     <Badge type={u.role === 'admin' ? 'ok' : 'info'}>{u.role}</Badge>,
+                    <Badge type={u.status === 'aprovado' || u.role === 'admin' ? 'ok' : u.status === 'recusado' ? 'danger' : 'warn'}>{u.status || 'aprovado'}</Badge>,
                     new Date(u.criado_em).toLocaleDateString('pt-BR'),
                     u.role !== 'admin' ? <Btn variant="danger" onClick={async () => { await api('/api/admin/usuarios', { method: 'DELETE', body: JSON.stringify({ id: u.id }) }); api('/api/admin/usuarios').then(setUsuarios) }} style={{ padding: '3px 8px', fontSize: 11 }}>Remover</Btn> : '—'
                   ])}

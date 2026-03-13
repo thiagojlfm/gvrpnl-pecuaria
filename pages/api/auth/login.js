@@ -11,6 +11,8 @@ export default async function handler(req, res) {
     'SELECT * FROM usuarios WHERE username = $1', [username]
   )
   if (error || !user) return res.status(401).json({ error: 'Usuário não encontrado' })
+  if (user.status === 'pendente') return res.status(401).json({ error: 'Cadastro aguardando aprovação do admin' })
+  if (user.status === 'recusado') return res.status(401).json({ error: 'Cadastro recusado pelo admin' })
 
   const valid = await bcrypt.compare(password, user.password_hash)
   if (!valid) return res.status(401).json({ error: 'Senha incorreta' })
