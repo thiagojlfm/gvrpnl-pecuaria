@@ -241,7 +241,7 @@ function NotifBell({notifs,onRead,T}){
 
 // ─── Animal Card ──────────────────────────────────────────────────────────────
 function AnimalCard({fase,mercado,T}){
-  const imgs={bezerro:'/bezerro.jpg',garrote:'/garrote.jpg',boi:'/boi.jpg',abatido:'/boi.jpg'}
+  const imgs={bezerro:'/bezerro.jpg',garrote:'/garrote.jpg',boi:'/boi.jpg',abatido:'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&q=80'}
   const precoMap={bezerro:mercado?.precos?.bezerro,garrote:mercado?.precos?.garrote,boi:mercado?.precos?.boi,abatido:mercado?.precos?.abate}
   const origem={bezerro:'Gov. NPC — fixo',garrote:'Livre entre jogadores',boi:'Livre entre jogadores',abatido:'Frigorífico NPC'}
   const badgeT={bezerro:'info',garrote:'purple',boi:'gray',abatido:'ok'}
@@ -411,7 +411,8 @@ export default function App(){
     return{custoBezerros,custoFrete,custoRacao,total,receita,margem,qty}
   }
 
-  const meusLotes=user?.role==='admin'?lotes:lotes.filter(l=>l.jogador_id===user?.id)
+  const meusLotes=lotes.filter(l=>String(l.jogador_id)===String(user?.id))
+  const todosLotes=lotes // admin usa esse pra ver tudo
   const abatesPend=lotes.filter(l=>l.status==='aguardando_pagamento')
   const solicPend=solic.filter(s=>s.status==='pendente')
   const usersPend=users.filter(u=>u.status==='pendente')
@@ -811,7 +812,7 @@ export default function App(){
           <Card T={T}>
             <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:14}}>Todo o rebanho</div>
             <Tbl T={T} headers={['Jogador','Fazenda','Lote','Qtd','Fase','Pronto em','Status','Ação','🗑']}
-              rows={lotes.filter(l=>!['pago','vendido'].includes(l.status)).map(l=>[
+              rows={todosLotes.filter(l=>!['pago','vendido'].includes(l.status)).map(l=>[
                 <span style={{fontWeight:600}}>{l.jogador_nome}</span>,l.fazenda,l.codigo,l.quantidade,faseBadge(l.fase),diasRest(l.data_fase4),
                 <Badge type={l.status==='ativo'?'gray':l.status==='aguardando_pagamento'?'amber':'ok'}>{l.status}</Badge>,
                 l.fase!=='abatido'&&l.status==='ativo'?<Btn T={T} v="ghost" onClick={async()=>{const r=await api(`/api/lotes/${l.id}`,{method:'PATCH',body:JSON.stringify({action:'avancar_fase'})});if(!r.error){notify('Fase avançada!');reload()}}} style={{padding:'4px 8px',fontSize:11}}>Avançar</Btn>:'—',
