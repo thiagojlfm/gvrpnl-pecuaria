@@ -1,4 +1,4 @@
-import { FazendasPage, MinhaFazendaPage } from './fazendas_components'
+import { FazendasPage, MinhaFazendaPage } from '../components/fazendas_components'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Head from 'next/head'
 
