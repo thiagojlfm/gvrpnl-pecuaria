@@ -1,3 +1,4 @@
+import { FazendasPage, MinhaFazendaPage } from './fazendas_components'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Head from 'next/head'
 
@@ -89,10 +90,11 @@ const L = {
 // ─── Primitives ───────────────────────────────────────────────────────────────
 function Badge({type, children}) {
   const s = {
-    ok:['#1a3a0a','#7ab648','#2a5a12'], warn:['#3a2a00','#c8922a','#6a5010'],
-    info:['#0a1830','#4a90d0','#1a3060'], gray:['#2a2018','#9a8060','#4a3020'],
-    purple:['#1a1030','#a080e0','#3a2060'], danger:['#3a0808','#e06060','#6a1818'],
-    amber:['#3a2000','#d08020','#6a3800'], gold:['#3a2800','#c8922a','#6a4810'],
+    ok:['#0a2a1a','#4ad4a0','#1a6a4a'], warn:['#3a2a00','#c8922a','#6a5010'],
+    info:['#0a0a30','#7060f0','#2010a0'], gray:['#2a2018','#9a8060','#4a3020'],
+    purple:['#100a30','#9060e0','#3020a0'], danger:['#3a0808','#e06060','#6a1818'],
+    amber:['#3a2000','#d08020','#6a3800'], gold:['#1a0a30','#a080ff','#5030c0'],
+    nl:['#0a0818','linear-gradient(135deg,#4060d0,#8040c0)','#3020a0'],
   }[type]||['#2a2018','#9a8060','#4a3020']
   return <span style={{background:s[0],color:s[1],border:`1px solid ${s[2]}`,fontSize:10,padding:'2px 8px',borderRadius:20,fontWeight:600,whiteSpace:'nowrap',display:'inline-block',letterSpacing:'.4px'}}>{children}</span>
 }
@@ -373,7 +375,7 @@ function AnimalCard({fase, mercado, T}) {
     bezerro:'/bezerro.jpg',
     garrote:'/garrote.jpg',
     boi:'/boi.jpg',
-    abatido:'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&q=80'
+    abatido:'/picanha.jpg'
   }
   const precoMap = {bezerro:mercado?.precos?.bezerro,garrote:mercado?.precos?.garrote,boi:mercado?.precos?.boi,abatido:mercado?.precos?.abate}
   const origem = {bezerro:'Gov. NPC — fixo',garrote:'Livre entre jogadores',boi:'Livre entre jogadores',abatido:'Frigorífico NPC'}
@@ -400,6 +402,8 @@ const NAV_ITEMS = [
   {id:'comprar',icon:'🛒',label:'Comprar',pub:false},
   {id:'rebanho',icon:'🐄',label:'Rebanho',pub:false},
   {id:'venda',icon:'🤝',label:'Venda',pub:false},
+  {id:'fazendas',icon:'🏡',label:'Fazendas',pub:true},
+  {id:'minha_fazenda',icon:'🌾',label:'Minha Fazenda',pub:false},
   {id:'ranking',icon:'🏆',label:'Ranking',pub:true},
   {id:'ajuda',icon:'❓',label:'Ajuda',pub:true},
   {id:'perfil',icon:'👤',label:'Perfil',pub:false},
@@ -476,6 +480,8 @@ export default function App() {
   const [notifs, setNotifs] = useState([])
   const [ranking, setRanking] = useState([])
   const [adminLog, setAdminLog] = useState([])
+  const [minhasFazendas, setMinhasFazendas] = useState([])
+  const [fazendas, setFazendas] = useState([])
   const [perfil, setPerfil] = useState(null)
   const [editPerfil, setEditPerfil] = useState({fazenda:'',foto_url:'',bio:'',nova_senha:''})
   const [editTarget, setEditTarget] = useState(null)
@@ -486,7 +492,7 @@ export default function App() {
   const [compraComp, setCompraComp] = useState('')
   const [compraStep, setCompraStep] = useState(1)
   const [confirmReset, setConfirmReset] = useState(false)
-  const [nLote, setNLote] = useState({jogador_id:'',jogador_nome:'',fazenda:'',quantidade:1,valor_compra:1100,data_compra:'',comprovante:''})
+  const [nLote, setNLote] = useState({jogador_id:'',jogador_nome:'',fazenda:'',fazenda_id:'',quantidade:1,valor_compra:1100,data_compra:'',comprovante:''})
   const [nUser, setNUser] = useState({username:'',password:'',fazenda:''})
   const [nAnuncio, setNAnuncio] = useState({lote_id:'',preco_pedido:'',obs:''})
   const [p2p, setP2p] = useState({anuncio_id:'',comprador_nome:'',preco_final:'',lote_id:''})
@@ -524,6 +530,7 @@ export default function App() {
       setPrecoHist(prev=>[...prev.slice(-6), d?.precos?.precoKg||3])
     })
     fetch('/api/ranking').then(r=>r.json()).then(setRanking)
+    fetch('/api/fazendas').then(r=>r.json()).then(setFazendas)
   },[])
 
   const reload = useCallback(()=>{
@@ -534,6 +541,7 @@ export default function App() {
     api('/api/solicitacoes').then(setSolic)
     api('/api/racao').then(setRacao)
     api('/api/notificacoes').then(setNotifs)
+    api('/api/fazendas?minha=1').then(setMinhasFazendas)
     api('/api/perfil').then(p=>{if(!p?.error){setPerfil(p);setEditPerfil({fazenda:p.fazenda||'',foto_url:p.foto_url||'',bio:p.bio||'',nova_senha:''})}})
     if(user?.role==='admin'){api('/api/admin/usuarios').then(setUsers);api('/api/admin/log').then(setAdminLog)}
   },[token,api,user])
@@ -1060,7 +1068,11 @@ export default function App() {
                     {users.filter(u=>u.role==='jogador'&&u.status==='aprovado').map(u=><option key={u.id} value={u.id}>{u.username}{u.fazenda?` — Faz. ${u.fazenda}`:''}</option>)}
                   </Sel>
                   <div style={gs(120)}>
-                    <Inp T={T} label="Quantidade" type="number" value={nLote.quantidade} onChange={e=>setNLote(f=>({...f,quantidade:Number(e.target.value)}))}/>
+                    <Sel T={T} label="Fazenda (opcional)" value={nLote.fazenda_id} onChange={e=>setNLote(f=>({...f,fazenda_id:e.target.value}))}>
+                    <option value="">Sem fazenda vinculada</option>
+                    {fazendas.map(f=><option key={f.id} value={f.id}>{f.codigo} — {f.nome} ({f.tamanho_ha}ha)</option>)}
+                  </Sel>
+                  <Inp T={T} label="Quantidade" type="number" value={nLote.quantidade} onChange={e=>setNLote(f=>({...f,quantidade:Number(e.target.value)}))}/>
                     <Inp T={T} label="Preço/cab ($)" type="number" value={nLote.valor_compra} onChange={e=>setNLote(f=>({...f,valor_compra:Number(e.target.value)}))}/>
                   </div>
                   <Inp T={T} label="Data compra" type="date" value={nLote.data_compra} onChange={e=>setNLote(f=>({...f,data_compra:e.target.value}))}/>
@@ -1185,6 +1197,11 @@ export default function App() {
                 ])}/>
             </Card>
           </>}
+
+          {/* ── FAZENDAS ── */}
+          {page==='fazendas'&&<FazendasPage T={T} user={user} api={api} notify={notify} users={users}/>}
+          {page==='minha_fazenda'&&<MinhaFazendaPage T={T} user={user} api={api} notify={notify} lotes={lotes} mercado={mercado}/>}
+
           {page==='hist'&&user?.role!=='admin'&&<Alrt type="danger">Acesso restrito — apenas administradores.</Alrt>}
 
         </div>
