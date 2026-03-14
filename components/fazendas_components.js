@@ -1061,8 +1061,8 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
       )}
 
       {/* Tabs */}
-      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
-        {[['disponivel','🚛 Fretes disponíveis'],['garagem','🏚 Minha garagem'],['historico','📋 Histórico']].map(([v,l]) => (
+      <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
+        {([['disponivel','🚛 Fretes disponíveis'],['garagem','🏚 Minha garagem'],['historico','📋 Histórico'],...(user?.role==='admin'?[['admin','⚙️ Admin']]:[])]).map(([v,l]) => (
           <button key={v} onClick={() => setTab(v)} style={{ padding:'7px 16px', borderRadius:20, border:`1px solid ${tab===v?'#5030c0':T.border}`, background:tab===v?'rgba(80,48,192,.2)':'transparent', color:tab===v?'#a080ff':T.textMuted, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:tab===v?600:400, transition:'all .15s', position:'relative' }}>
             {l}
             {v==='disponivel'&&fretes.length>0&&<span style={{ position:'absolute', top:-5, right:-5, background:'#e06060', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>{fretes.length}</span>}
@@ -1159,7 +1159,10 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
         </div>
       )}
 
-      {/* Modal aceitar frete */}
+      {/* Admin Panel */}
+      {tab === 'admin' && user?.role === 'admin' && <AdminTransportadoraPanel T={T} api={api} notify={notify} sounds={sounds} onReload={load}/>}
+
+      {/* Modal aceitar frete */}}
       {aceitando && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
           <div style={{ background:T.card, border:'1px solid #3020a0', borderRadius:20, padding:32, width:'100%', maxWidth:400, boxShadow:'0 30px 80px rgba(0,0,0,.5)' }}>
@@ -1394,4 +1397,250 @@ export function ConcessionariaPage({ T, user, api, notify, sounds }) {
 function Badge({ type, children }) {
   const s = { amber:['#3a2000','#e09030','#6a3800'], ok:['#0a2010','#4ad4a0','#1a5a30'] }[type]||['#2a2018','#9a8060','#4a3020']
   return <span style={{ background:s[0], color:s[1], border:`1px solid ${s[2]}`, fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600, marginLeft:8 }}>{children}</span>
+}
+
+// ─── Admin Transportadora Panel ───────────────────────────────────────────────
+function AdminTransportadoraPanel({ T, api, notify, sounds, onReload }) {
+  const [fretes, setFretes] = useState([])
+  const [caminhoes, setCaminhoes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [confirmDelete, setConfirmDelete] = useState(null) // caminhao id
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [f, c] = await Promise.all([
+      api('/api/transportadora?tipo=todos'),
+      api('/api/admin/caminhoes'),
+    ])
+    setFretes(Array.isArray(f) ? f : [])
+    setCaminhoes(Array.isArray(c) ? c : [])
+    setLoading(false)
+  }, [api])
+
+  useEffect(() => { load() }, [load])
+
+  async function deleteCaminhao(id) {
+    const r = await api('/api/admin/caminhoes', { method: 'DELETE', body: JSON.stringify({ id }) })
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.success()
+    notify('✓ Caminhão removido!')
+    setConfirmDelete(null)
+    load()
+    onReload && onReload()
+  }
+
+  async function marcarPago(id) {
+    const r = await api('/api/transportadora', { method: 'PATCH', body: JSON.stringify({ id, pago: true }) })
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.coin()
+    notify('✓ Frete marcado como pago!')
+    load()
+  }
+
+  async function resetarTudo() {
+    if (!confirm('Resetar TODA a transportadora? Apaga fretes e caminhões.')) return
+    await api('/api/transportadora', { method: 'DELETE' })
+    notify('✓ Transportadora resetada!')
+    load()
+    onReload && onReload()
+  }
+
+  // Agrupar caminhões por dono
+  const frotas = caminhoes.reduce((acc, c) => {
+    const nome = c.jogador_nome || 'Desconhecido'
+    if (!acc[nome]) acc[nome] = []
+    acc[nome].push(c)
+    return acc
+  }, {})
+
+  const fretesEmRota = fretes.filter(f => ['em_rota_buscar','em_rota_fazenda'].includes(f.status))
+  const fretesAguardando = fretes.filter(f => f.status === 'entregue' && !f.pago)
+  const fretesDisponiveis = fretes.filter(f => f.status === 'disponivel')
+
+  if (loading) return <div style={{ textAlign:'center', padding:40, color:T.textMuted }}>Carregando painel admin...</div>
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      {/* Resumo */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))', gap:12 }}>
+        {[
+          { label:'Caminhões total', value:caminhoes.length, icon:'🚛', color:T.text },
+          { label:'Em rota agora', value:fretesEmRota.length, icon:'🔄', color:fretesEmRota.length>0?'#a080ff':T.text },
+          { label:'Aguard. pagamento', value:fretesAguardando.length, icon:'💰', color:fretesAguardando.length>0?'#e09030':T.text },
+          { label:'Fretes disponíveis', value:fretesDisponiveis.length, icon:'📦', color:T.text },
+          { label:'Frotas ativas', value:Object.keys(frotas).length, icon:'👥', color:T.gold||'#c8922a' },
+        ].map(m => (
+          <div key={m.label} style={{ background:T.inputBg, borderRadius:12, padding:'14px 16px', border:`1px solid ${T.border}` }}>
+            <div style={{ fontSize:10, color:T.textMuted, marginBottom:6, textTransform:'uppercase', letterSpacing:'1px', fontWeight:600 }}>{m.icon} {m.label}</div>
+            <div style={{ fontSize:22, fontWeight:700, color:m.color, fontFamily:"'Playfair Display',serif" }}>{m.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Aguardando pagamento */}
+      {fretesAguardando.length > 0 && (
+        <div style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:16, padding:20 }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700, color:T.text, marginBottom:6 }}>
+            💰 Aguardando addmoney
+          </div>
+          <p style={{ fontSize:12, color:T.textMuted, marginBottom:14 }}>Faça o addmoney no servidor para cada transportador, depois marque como pago.</p>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {fretesAguardando.map(f => (
+              <div key={f.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:T.inputBg, borderRadius:12, border:`1px solid #6a4010`, flexWrap:'wrap' }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:T.text }}>{f.transportador_nome}</div>
+                  <div style={{ fontSize:12, color:T.textMuted }}>Frete {f.lote_codigo} · {f.quantidade} cab. · {f.origem} → {f.destino}</div>
+                  <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>
+                    Entregue em {new Date(f.aceito_em||f.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
+                  </div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#4ad4a0', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
+                  <div style={{ fontSize:10, color:T.textMuted }}>a receber</div>
+                </div>
+                <button onClick={() => marcarPago(f.id)} style={{ padding:'8px 16px', background:'linear-gradient(135deg,#1a4a10,#2a7a18)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
+                  ✓ Addmoney feito
+                </button>
+              </div>
+            ))}
+            <div style={{ fontSize:13, color:T.textMuted, textAlign:'right', paddingTop:4 }}>
+              Total a pagar: <strong style={{ color:'#4ad4a0', fontFamily:"'Playfair Display',serif" }}>${fmt(fretesAguardando.reduce((s,f)=>s+Number(f.valor),0))}</strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Em rota agora */}
+      {fretesEmRota.length > 0 && (
+        <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:20 }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700, color:T.text, marginBottom:14 }}>
+            🔄 Fretes em andamento agora
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {fretesEmRota.map(f => {
+              const chegaEm = new Date(f.chegada_fazenda_em || f.entrega_em)
+              const mins = Math.max(0, Math.ceil((chegaEm - Date.now()) / 60000))
+              return (
+                <div key={f.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:T.inputBg, borderRadius:12, border:'1px solid #3020a0', flexWrap:'wrap' }}>
+                  <div style={{ fontSize:24 }}>🚛</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:T.text }}>{f.transportador_nome}</div>
+                    <div style={{ fontSize:12, color:T.textMuted }}>{f.lote_codigo} · {f.quantidade} cab. · {f.origem} → {f.destino}</div>
+                    <div style={{ fontSize:11, color:'#a080ff', marginTop:2 }}>
+                      {f.status==='em_rota_buscar'?'🚛 Indo buscar o gado...':'🐄 Gado a caminho da fazenda...'}
+                    </div>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:16, fontWeight:700, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
+                    <div style={{ fontSize:11, color:T.textMuted }}>~{mins} min restantes</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Frotas por jogador */}
+      <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:20 }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700, color:T.text, marginBottom:14 }}>
+          👥 Frotas por jogador
+        </div>
+        {Object.keys(frotas).length === 0 ? (
+          <div style={{ textAlign:'center', padding:'20px 0', color:T.textMuted, fontSize:13 }}>Nenhum caminhão cadastrado</div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            {Object.entries(frotas).map(([nome, cams]) => (
+              <div key={nome} style={{ background:T.inputBg, borderRadius:12, padding:'14px 16px', border:`1px solid ${T.border}` }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, flexWrap:'wrap', gap:8 }}>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:T.text }}>{nome}</div>
+                    <div style={{ fontSize:12, color:T.textMuted }}>{cams.length} caminhão(ões) · capacidade total: {cams.reduce((s,c)=>s+c.capacidade,0)} cab.</div>
+                  </div>
+                  <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                    <span style={{ background:'rgba(10,42,10,.6)', border:'1px solid #2a5a12', color:'#4ad4a0', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>
+                      {cams.filter(c=>c.status==='disponivel').length} livre(s)
+                    </span>
+                    <span style={{ background:'rgba(10,8,24,.6)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>
+                      {cams.filter(c=>c.status==='em_rota').length} em rota
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {cams.map(c => (
+                    <div key={c.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:T.card, borderRadius:8, border:`1px solid ${T.border}` }}>
+                      <span style={{ fontSize:16 }}>🚛</span>
+                      <div style={{ flex:1 }}>
+                        <span style={{ fontSize:13, fontWeight:600, color:T.text }}>{c.modelo}</span>
+                        <span style={{ fontSize:11, color:T.textMuted, marginLeft:8 }}>Placa {c.placa} · {c.capacidade} cab.</span>
+                      </div>
+                      <span style={{ background:c.status==='disponivel'?'rgba(10,42,10,.6)':'rgba(10,8,24,.6)', border:`1px solid ${c.status==='disponivel'?'#2a5a12':'#3020a0'}`, color:c.status==='disponivel'?'#4ad4a0':'#a080ff', fontSize:10, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>
+                        {c.status==='disponivel'?'Livre':'Em rota'}
+                      </span>
+                      {confirmDelete === c.id ? (
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button onClick={() => deleteCaminhao(c.id)} style={{ padding:'4px 10px', background:'#3a0808', color:'#e06060', border:'1px solid #6a1818', borderRadius:6, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Confirmar</button>
+                          <button onClick={() => setConfirmDelete(null)} style={{ padding:'4px 8px', background:'transparent', color:T.textMuted, border:`1px solid ${T.border}`, borderRadius:6, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmDelete(c.id)} style={{ padding:'4px 10px', background:'#3a0808', color:'#e06060', border:'1px solid #6a1818', borderRadius:6, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>✕ Apagar</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Histórico completo */}
+      <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:20 }}>
+        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700, color:T.text, marginBottom:14 }}>
+          📋 Todos os fretes
+        </div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead>
+              <tr>{['Lote','Transportador','Carga','Valor','Status','Pago'].map(h=>(
+                <th key={h} style={{ textAlign:'left', padding:'8px 12px', fontSize:10, fontWeight:600, color:T.textMuted, borderBottom:`1px solid ${T.border}`, textTransform:'uppercase', letterSpacing:'.5px', whiteSpace:'nowrap' }}>{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {fretes.length === 0 && <tr><td colSpan={6} style={{ padding:24, textAlign:'center', color:T.textMuted }}>Nenhum frete registrado</td></tr>}
+              {fretes.map(f => (
+                <tr key={f.id} style={{ borderBottom:`1px solid ${T.border}` }}>
+                  <td style={{ padding:'10px 12px', color:T.text, fontWeight:600 }}>{f.lote_codigo||'—'}</td>
+                  <td style={{ padding:'10px 12px', color:T.textDim }}>{f.transportador_nome||<span style={{color:T.textMuted,fontStyle:'italic'}}>Aguardando</span>}</td>
+                  <td style={{ padding:'10px 12px', color:T.textDim }}>{f.quantidade} cab.</td>
+                  <td style={{ padding:'10px 12px', color:'#a080ff', fontWeight:700, fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</td>
+                  <td style={{ padding:'10px 12px' }}>
+                    <span style={{ background:f.status==='entregue'?'rgba(10,42,10,.6)':f.status==='disponivel'?'rgba(42,24,0,.6)':'rgba(10,8,24,.6)', border:`1px solid ${f.status==='entregue'?'#2a5a12':f.status==='disponivel'?'#8a4010':'#3020a0'}`, color:f.status==='entregue'?'#4ad4a0':f.status==='disponivel'?'#e09030':'#a080ff', fontSize:10, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>
+                      {f.status==='entregue'?'Entregue':f.status==='disponivel'?'Disponível':f.status==='em_rota_buscar'?'Buscando':'Entregando'}
+                    </span>
+                  </td>
+                  <td style={{ padding:'10px 12px' }}>
+                    {f.status==='entregue' && !f.pago ? (
+                      <button onClick={() => marcarPago(f.id)} style={{ padding:'4px 10px', background:'linear-gradient(135deg,#1a4a10,#2a7a18)', color:'#fff', border:'none', borderRadius:6, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>✓ Pagar</button>
+                    ) : f.pago ? (
+                      <span style={{ color:'#4ad4a0', fontSize:11, fontWeight:600 }}>✓ Pago</span>
+                    ) : <span style={{ color:T.textMuted, fontSize:11 }}>—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Botão reset geral */}
+      <div style={{ display:'flex', justifyContent:'flex-end' }}>
+        <button onClick={resetarTudo} style={{ padding:'9px 18px', background:'#3a0808', color:'#e06060', border:'1px solid #6a1818', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+          🗑 Resetar toda a transportadora
+        </button>
+      </div>
+
+    </div>
+  )
 }
