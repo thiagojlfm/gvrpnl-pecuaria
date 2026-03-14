@@ -16,11 +16,9 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { tipo } = req.query
 
-    // Seed/update models
-    const { data: exist } = await query(`SELECT id FROM concessionaria_estoque WHERE preco < 80000 LIMIT 1`, [])
-    if (exist?.length) { await query(`DELETE FROM concessionaria_estoque`, []) }
-    const { data: existOk } = await query(`SELECT id FROM concessionaria_estoque LIMIT 1`, [])
-    if (!existOk?.length) {
+    // Always sync prices
+    await query(`DELETE FROM concessionaria_estoque`, [])
+    if (true) {
       for (const m of MODELOS_PADRAO) {
         await query(
           `INSERT INTO concessionaria_estoque (modelo, descricao, capacidade, preco, foto_url) VALUES ($1,$2,$3,$4,$5)`,

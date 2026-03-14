@@ -180,9 +180,9 @@ export default async function handler(req, res) {
   // DELETE — admin reseta transportadora
   if (req.method === 'DELETE') {
     if (!user || user.role !== 'admin') return res.status(403).json({ error: 'Sem permissão' })
-    await query(`UPDATE caminhoes SET status='disponivel'`, [])
+    await query(`DELETE FROM caminhoes`, [])              // apaga todos os caminhões
     await query(`DELETE FROM fretes_transportadora`, [])
-    await query(`DELETE FROM pedidos_caminhao WHERE status='pendente'`, [])
+    await query(`DELETE FROM pedidos_caminhao`, [])           // apaga todos os pedidos
     await query(`INSERT INTO admin_log (admin_nome, acao, detalhes) VALUES ($1,$2,$3)`,
       [user.username, 'Transportadora resetada', 'Todos os fretes removidos, caminhões liberados'])
     return res.json({ ok: true })

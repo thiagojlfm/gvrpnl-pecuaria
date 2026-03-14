@@ -155,17 +155,22 @@ function FazendaModal({ fazenda, onClose, T, user, api, notify, users }) {
 
   async function salvar() {
     setSaving(true)
+    const isAdmin = user?.role === 'admin'
     const donoUser = users?.find(u => u.id === editDono)
+    const body = isAdmin ? {
+      id: fazenda.id,
+      preco: editPreco || null,
+      nome: editNome,
+      dono_id: editDono || null,
+      dono_nome: donoUser?.username || null,
+      status: editDono ? 'ocupada' : 'disponivel'
+    } : {
+      id: fazenda.id,
+      nome: editNome  // owner can only edit name
+    }
     const r = await api('/api/fazendas', {
       method: 'PATCH',
-      body: JSON.stringify({
-        id: fazenda.id,
-        preco: editPreco || null,
-        nome: editNome,
-        dono_id: editDono || null,
-        dono_nome: donoUser?.username || null,
-        status: editDono ? 'ocupada' : 'disponivel'
-      })
+      body: JSON.stringify(body)
     })
     setSaving(false)
     if (r.error) return notify('Erro: ' + r.error, 'danger')
@@ -213,8 +218,8 @@ function FazendaModal({ fazenda, onClose, T, user, api, notify, users }) {
           </div>
         )}
 
-        {/* Admin Edit */}
-        {user?.role === 'admin' && (
+        {/* Edit — admin or owner */}
+        {(user?.role === 'admin' || String(user?.id) === String(fazenda.dono_id)) && (
           <div style={{ borderTop:`1px solid ${T.border}`, paddingTop:16, marginTop:4 }}>
             <div style={{ fontSize:12, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.8px', marginBottom:12 }}>Editar fazenda</div>
             <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
