@@ -98,13 +98,37 @@ export default async function handler(req, res) {
          `Lote ${codigo} criado com ${solic.quantidade} bezerros. Ração para a fase bezerro (${racaoBezerro}kg) já creditada. Compre ração no Celeiro para as próximas fases.`]
       )
 
-      // Frete — 2 min
-      const chegaEm = new Date(Date.now() + 2 * 60 * 1000)
+      // Frete interno — 30min buscar + 30min entregar
+      const buscaEm = new Date(Date.now() + 30 * 60 * 1000)
+      const chegaEm = new Date(Date.now() + 60 * 60 * 1000)
       await query(
         `INSERT INTO frete (lote_id, jogador_id, fazenda_id, status, chega_em)
-         VALUES ($1,$2,$3,'em_transito',$4)`,
+         VALUES ($1,$2,$3,'em_rota_buscar',$4)`,
         [lote.id, solic.jogador_id, solic.fazenda_id || null, chegaEm.toISOString()]
       )
+
+      // Criar frete na transportadora — $10/cab
+      const valorFrete = solic.quantidade * 10
+      const origem = 'Curral Gov. NPC'
+      const destino = solic.fazenda_id ? `Fazenda ${jogador?.fazenda || solic.jogador_nome}` : 'Fazenda do Jogador'
+      await query(
+        `INSERT INTO fretes_transportadora
+         (lote_id, lote_codigo, origem, destino, quantidade, valor, comprador_id, status, criado_em)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel',now())`,
+        [lote.id, codigo, origem, destino, solic.quantidade, valorFrete, solic.jogador_id]
+      )
+
+      // Notificar todos transportadores disponíveis
+      const { data: transportadores } = await query(
+        `SELECT DISTINCT jogador_id FROM caminhoes WHERE status='disponivel'`, []
+      )
+      for (const t of (transportadores||[])) {
+        await query(
+          `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+          [t.jogador_id, '🚛 Frete disponível!',
+           `${solic.quantidade} bezerros para transportar — $${valorFrete}. Acesse a Transportadora para aceitar!`]
+        )
+      }
 
       // Log
       await query(`INSERT INTO admin_log (admin_nome, acao, detalhes) VALUES ($1,$2,$3)`,

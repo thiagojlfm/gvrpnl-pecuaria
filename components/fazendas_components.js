@@ -843,3 +843,538 @@ export function CeleiroPage({ T, user, api, notify, mercado, sounds }) {
     </div>
   )
 }
+
+// ─── Frete Tracker 2-step ─────────────────────────────────────────────────────
+export function FreteTracker2({ frete, T, onUpdate }) {
+  const [fase, setFase] = useState('buscar') // buscar | fazenda | entregue
+  const [segundos, setSegundos] = useState(0)
+  const [pct, setPct] = useState(0)
+
+  useEffect(() => {
+    if (!frete) return
+    const update = () => {
+      const agora = Date.now()
+      const buscaEm = frete.busca_em ? new Date(frete.busca_em).getTime() : agora + 30*60*1000
+      const chegaEm = new Date(frete.chega_em).getTime()
+      const total = chegaEm - (buscaEm - 30*60*1000)
+
+      if (agora < buscaEm) {
+        // Fase 1: indo buscar
+        setFase('buscar')
+        const diff = Math.max(0, Math.ceil((buscaEm - agora) / 1000))
+        setSegundos(diff)
+        const elapsed = agora - (buscaEm - 30*60*1000)
+        setPct(Math.min(50, (elapsed / total) * 100))
+      } else if (agora < chegaEm) {
+        // Fase 2: gado a caminho
+        setFase('fazenda')
+        const diff = Math.max(0, Math.ceil((chegaEm - agora) / 1000))
+        setSegundos(diff)
+        const elapsed = agora - buscaEm
+        setPct(50 + Math.min(50, (elapsed / (30*60*1000)) * 50))
+      } else {
+        setFase('entregue')
+        setPct(100)
+        onUpdate && onUpdate()
+      }
+    }
+    update()
+    const iv = setInterval(update, 1000)
+    return () => clearInterval(iv)
+  }, [frete, onUpdate])
+
+  if (!frete) return null
+
+  const mins = Math.floor(segundos / 60)
+  const secs = segundos % 60
+  const entregue = fase === 'entregue'
+
+  const fases = [
+    { id:'buscar', label:'🚛 Indo buscar', done: fase !== 'buscar' || entregue },
+    { id:'fazenda', label:'🐄 Gado a caminho', done: entregue },
+    { id:'entregue', label:'✅ Entregue', done: entregue },
+  ]
+
+  return (
+    <div style={{background:'#0a0818',border:'1px solid #3020a0',borderRadius:14,padding:18,marginBottom:16,overflow:'hidden',position:'relative'}}>
+      <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${pct}%`,background:'linear-gradient(90deg,rgba(64,96,208,.12),rgba(128,64,192,.08))',transition:'width 1s linear'}}/>
+      <div style={{position:'relative'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:entregue?'#4ad4a0':'#a080ff'}}>
+              {entregue ? '✓ Bezerros chegaram!' : fase === 'buscar' ? '🚛 Caminhão indo buscar o gado...' : '🐄 Gado a caminho da fazenda!'}
+            </div>
+            <div style={{fontSize:11,color:'#7060a0',marginTop:2}}>Transporte Gov. NPC</div>
+          </div>
+          {!entregue && (
+            <div style={{fontSize:24,fontWeight:800,color:'#a080ff',fontFamily:"'Playfair Display',serif"}}>
+              {mins}:{String(secs).padStart(2,'0')}
+            </div>
+          )}
+        </div>
+
+        {/* Steps */}
+        <div style={{display:'flex',alignItems:'center',gap:0,marginBottom:12}}>
+          {fases.map((f, i) => (
+            <div key={f.id} style={{display:'flex',alignItems:'center',flex:i<fases.length-1?1:'auto'}}>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                <div style={{width:28,height:28,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,background:f.done||f.id===fase?'rgba(80,48,192,.4)':'rgba(255,255,255,.05)',border:`2px solid ${f.done||f.id===fase?'#8060d0':'#2a1a50'}`,transition:'all .3s'}}>
+                  {f.done ? '✓' : f.id === fase ? '●' : '○'}
+                </div>
+                <div style={{fontSize:10,color:f.done||f.id===fase?'#a080ff':'#4a3060',whiteSpace:'nowrap',fontWeight:f.id===fase?600:400}}>{f.label}</div>
+              </div>
+              {i < fases.length-1 && (
+                <div style={{flex:1,height:2,background:f.done?'#6040c0':'rgba(255,255,255,.05)',margin:'0 8px',marginBottom:20,transition:'background .5s'}}/>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <div style={{background:'rgba(255,255,255,.05)',borderRadius:6,height:6,overflow:'hidden'}}>
+          <div style={{width:`${pct}%`,height:'100%',background:'linear-gradient(90deg,#4060d0,#8040c0)',borderRadius:6,transition:'width 1s linear'}}/>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Transportadora Page ──────────────────────────────────────────────────────
+export function TransportadoraPage({ T, user, api, notify, sounds }) {
+  const [fretes, setFretes] = useState([])
+  const [meusFretes, setMeusFretes] = useState([])
+  const [caminhoes, setCaminhoes] = useState([])
+  const [stats, setStats] = useState(null)
+  const [tab, setTab] = useState('disponivel') // disponivel | garagem | historico
+  const [aceitando, setAceitando] = useState(null)
+  const [caminhaoSel, setCaminhaoSel] = useState('')
+
+  const load = useCallback(async () => {
+    if (!user) return
+    const [f, mf, c, s] = await Promise.all([
+      api('/api/transportadora?tipo=disponiveis'),
+      api('/api/transportadora?tipo=meus'),
+      api('/api/transportadora?tipo=caminhoes'),
+      api('/api/transportadora?tipo=stats'),
+    ])
+    setFretes(Array.isArray(f) ? f : [])
+    setMeusFretes(Array.isArray(mf) ? mf : [])
+    setCaminhoes(Array.isArray(c) ? c : [])
+    setStats(s)
+  }, [user, api])
+
+  useEffect(() => { load() }, [load])
+
+  // Poll fretes disponíveis a cada 10s
+  useEffect(() => {
+    if (!user) return
+    const iv = setInterval(() => api('/api/transportadora?tipo=disponiveis').then(f => setFretes(Array.isArray(f)?f:[])), 10000)
+    return () => clearInterval(iv)
+  }, [user, api])
+
+  async function aceitarFrete() {
+    if (!caminhaoSel) return notify('Selecione um caminhão!', 'danger')
+    const r = await api('/api/transportadora', {
+      method: 'POST',
+      body: JSON.stringify({ frete_id: aceitando.id, caminhao_id: parseInt(caminhaoSel) })
+    })
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.success()
+    notify('✓ Frete aceito! Caminhão em rota.')
+    setAceitando(null)
+    load()
+  }
+
+  const caminhoesLivres = caminhoes.filter(c => c.status === 'disponivel')
+  const emRota = meusFretes.filter(f => ['em_rota_buscar','em_rota_fazenda'].includes(f.status))
+  const pendPagamento = meusFretes.filter(f => f.status === 'entregue' && !f.pago)
+
+  return (
+    <div>
+      <div style={{ marginBottom:28, paddingBottom:16, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
+          <span style={{ fontSize:24 }}>🚛</span>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Transportadora</h1>
+        </div>
+        <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Aceite fretes, gerencie sua frota e receba por cada entrega</p>
+      </div>
+
+      {/* Stats */}
+      {stats && (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))', gap:12, marginBottom:20 }}>
+          {[
+            { label:'Total fretes', value:stats.total_fretes, icon:'📦', color:T.text },
+            { label:'Total ganho', value:`$${fmt(stats.total_ganho)}`, icon:'💰', color:T.gold||'#c8922a' },
+            { label:'Aguard. pagamento', value:pendPagamento.length, icon:'⏳', color:pendPagamento.length>0?'#e09030':T.text },
+            { label:'Caminhões livres', value:caminhoesLivres.length, icon:'🚛', color:caminhoesLivres.length>0?'#4ad4a0':'#e06060' },
+          ].map(m => (
+            <div key={m.label} style={{ background:T.inputBg, borderRadius:12, padding:'14px 16px', border:`1px solid ${T.border}` }}>
+              <div style={{ fontSize:10, color:T.textMuted, marginBottom:6, textTransform:'uppercase', letterSpacing:'1px', fontWeight:600 }}>{m.icon} {m.label}</div>
+              <div style={{ fontSize:20, fontWeight:700, color:m.color, fontFamily:"'Playfair Display',serif" }}>{m.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Fretes em andamento */}
+      {emRota.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          {emRota.map(f => (
+            <div key={f.id} style={{ background:'#0a0818', border:'1px solid #3020a0', borderRadius:14, padding:18, marginBottom:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#a080ff' }}>{f.lote_codigo} — {f.quantidade} cab.</div>
+                  <div style={{ fontSize:11, color:'#7060a0' }}>{f.origem} → {f.destino}</div>
+                </div>
+                <div style={{ fontSize:18, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
+              </div>
+              <FreteEmAndamento frete={f} T={T} onEntregue={() => { sounds?.coin(); load() }}/>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pendentes de pagamento */}
+      {pendPagamento.length > 0 && (
+        <div style={{ background:'rgba(42,24,0,.6)', border:'1px solid #8a4010', borderRadius:14, padding:16, marginBottom:16 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'#e09030', marginBottom:10 }}>⏳ Aguardando pagamento do admin</div>
+          {pendPagamento.map(f => (
+            <div key={f.id} style={{ display:'flex', justifyContent:'space-between', fontSize:13, padding:'6px 0', borderBottom:`1px solid rgba(255,255,255,.05)` }}>
+              <span style={{ color:T.textDim }}>{f.lote_codigo} · {f.quantidade} cab.</span>
+              <span style={{ color:'#e09030', fontWeight:700, fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</span>
+            </div>
+          ))}
+          <div style={{ fontSize:11, color:T.textMuted, marginTop:8 }}>Total pendente: <strong style={{color:'#e09030'}}>${fmt(pendPagamento.reduce((s,f)=>s+Number(f.valor),0))}</strong></div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+        {[['disponivel','🚛 Fretes disponíveis'],['garagem','🏚 Minha garagem'],['historico','📋 Histórico']].map(([v,l]) => (
+          <button key={v} onClick={() => setTab(v)} style={{ padding:'7px 16px', borderRadius:20, border:`1px solid ${tab===v?'#5030c0':T.border}`, background:tab===v?'rgba(80,48,192,.2)':'transparent', color:tab===v?'#a080ff':T.textMuted, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:tab===v?600:400, transition:'all .15s', position:'relative' }}>
+            {l}
+            {v==='disponivel'&&fretes.length>0&&<span style={{ position:'absolute', top:-5, right:-5, background:'#e06060', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>{fretes.length}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Fretes disponíveis */}
+      {tab === 'disponivel' && (
+        <>
+          {fretes.length === 0 ? (
+            <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:48, textAlign:'center' }}>
+              <div style={{ fontSize:48, marginBottom:12 }}>🚛</div>
+              <div style={{ fontSize:16, color:T.textMuted }}>Nenhum frete disponível no momento</div>
+              <div style={{ fontSize:12, color:T.textMuted, marginTop:6 }}>Quando alguém comprar gado você será notificado!</div>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {fretes.map(f => (
+                <div key={f.id} style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:18, display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+                  <div style={{ fontSize:32 }}>🐄</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:15, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>{f.quantidade} cabeças</div>
+                    <div style={{ fontSize:12, color:T.textMuted, marginTop:2 }}>{f.origem} → {f.destino}</div>
+                    <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>⏱ 1 hora de rota</div>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:22, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
+                    <div style={{ fontSize:11, color:T.textMuted }}>${10}/cab</div>
+                  </div>
+                  <button
+                    onClick={() => { setAceitando(f); setCaminhaoSel(caminhoesLivres[0]?.id?.toString() || '') }}
+                    disabled={caminhoesLivres.length === 0}
+                    style={{ padding:'10px 20px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:caminhoesLivres.length>0?'pointer':'not-allowed', fontFamily:'inherit', opacity:caminhoesLivres.length>0?1:.5 }}
+                  >
+                    {caminhoesLivres.length > 0 ? 'Aceitar frete' : 'Sem caminhão livre'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Garagem */}
+      {tab === 'garagem' && (
+        <>
+          {caminhoes.length === 0 ? (
+            <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:48, textAlign:'center' }}>
+              <div style={{ fontSize:48, marginBottom:12 }}>🏚</div>
+              <div style={{ fontSize:16, color:T.textMuted }}>Garagem vazia</div>
+              <div style={{ fontSize:12, color:T.textMuted, marginTop:6 }}>Compre um caminhão na Concessionária!</div>
+            </div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:14 }}>
+              {caminhoes.map(c => (
+                <div key={c.id} style={{ background:T.card, border:`1px solid ${c.status==='disponivel'?T.border:'#3020a0'}`, borderRadius:14, padding:18 }}>
+                  <div style={{ fontSize:32, marginBottom:10 }}>🚛</div>
+                  <div style={{ fontSize:15, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>{c.modelo}</div>
+                  <div style={{ fontSize:12, color:T.textMuted, marginBottom:8 }}>Placa {c.placa} · {c.capacidade} cab. máx</div>
+                  <span style={{ background:c.status==='disponivel'?'rgba(10,42,10,.8)':'rgba(10,8,24,.8)', border:`1px solid ${c.status==='disponivel'?'#2a5a12':'#3020a0'}`, color:c.status==='disponivel'?'#4ad4a0':'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
+                    {c.status==='disponivel'?'✓ Disponível':'🚛 Em rota'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Histórico */}
+      {tab === 'historico' && (
+        <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:18 }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:T.text, marginBottom:14 }}>Histórico de fretes</div>
+          {meusFretes.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'20px 0', color:T.textMuted, fontSize:13 }}>Nenhum frete realizado ainda</div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+              {meusFretes.map((f,i) => (
+                <div key={f.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom:i<meusFretes.length-1?`1px solid ${T.border}`:'none', flexWrap:'wrap' }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{f.lote_codigo} · {f.quantidade} cab.</div>
+                    <div style={{ fontSize:11, color:T.textMuted }}>{f.origem} → {f.destino}</div>
+                    <div style={{ fontSize:10, color:T.textMuted }}>{new Date(f.criado_em).toLocaleDateString('pt-BR')}</div>
+                  </div>
+                  <div style={{ fontWeight:700, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
+                  <span style={{ background:f.pago?'rgba(10,42,10,.8)':f.status==='entregue'?'rgba(42,24,0,.8)':'rgba(10,8,24,.8)', border:`1px solid ${f.pago?'#2a5a12':f.status==='entregue'?'#8a4010':'#3020a0'}`, color:f.pago?'#4ad4a0':f.status==='entregue'?'#e09030':'#a080ff', fontSize:10, padding:'3px 8px', borderRadius:10, fontWeight:600 }}>
+                    {f.pago?'✓ Pago':f.status==='entregue'?'⏳ Aguard. pgto':f.status==='em_rota_buscar'?'🚛 Buscando':'🐄 Entregando'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal aceitar frete */}
+      {aceitando && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
+          <div style={{ background:T.card, border:'1px solid #3020a0', borderRadius:20, padding:32, width:'100%', maxWidth:400, boxShadow:'0 30px 80px rgba(0,0,0,.5)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+              <h3 style={{ fontFamily:"'Playfair Display',serif", fontSize:18, color:T.text }}>Aceitar Frete</h3>
+              <button onClick={() => setAceitando(null)} style={{ background:'none', border:'none', color:T.textMuted, fontSize:22, cursor:'pointer' }}>×</button>
+            </div>
+            <div style={{ background:T.inputBg, borderRadius:12, padding:16, marginBottom:16, border:`1px solid ${T.border}` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:8 }}>
+                <span style={{ color:T.textMuted }}>Carga</span>
+                <span style={{ fontWeight:700, color:T.text }}>{aceitando.quantidade} bezerros</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:8 }}>
+                <span style={{ color:T.textMuted }}>Rota</span>
+                <span style={{ color:T.textDim, fontSize:12 }}>{aceitando.origem} → {aceitando.destino}</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:8 }}>
+                <span style={{ color:T.textMuted }}>Duração</span>
+                <span style={{ color:T.textDim }}>1 hora (30min + 30min)</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:18, fontWeight:800, fontFamily:"'Playfair Display',serif", paddingTop:8, borderTop:`1px solid ${T.border}` }}>
+                <span style={{ color:T.text }}>Ganho</span>
+                <span style={{ color:'#a080ff' }}>${fmt(aceitando.valor)}</span>
+              </div>
+            </div>
+            {caminhoesLivres.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:8 }}>Selecionar caminhão</label>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {caminhoesLivres.map(c => (
+                    <button key={c.id} onClick={() => setCaminhaoSel(c.id.toString())} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:caminhaoSel===c.id.toString()?'rgba(80,48,192,.2)':T.inputBg, border:`1px solid ${caminhaoSel===c.id.toString()?'#5030c0':T.border}`, borderRadius:10, cursor:'pointer', fontFamily:'inherit', transition:'all .15s', textAlign:'left' }}>
+                      <span style={{ fontSize:20 }}>🚛</span>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{c.modelo}</div>
+                        <div style={{ fontSize:11, color:T.textMuted }}>Placa {c.placa} · {c.capacidade} cab. máx</div>
+                      </div>
+                      {caminhaoSel===c.id.toString()&&<span style={{ marginLeft:'auto', color:'#a080ff', fontSize:16 }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setAceitando(null)} style={{ flex:1, padding:10, background:'transparent', border:`1px solid ${T.border2}`, color:T.textDim, borderRadius:10, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+              <button onClick={aceitarFrete} style={{ flex:2, padding:10, background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>🚛 Aceitar — ${fmt(aceitando.valor)}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Frete em andamento (mini tracker) ───────────────────────────────────────
+function FreteEmAndamento({ frete, T, onEntregue }) {
+  const [fase, setFase] = useState('buscar')
+  const [segundos, setSegundos] = useState(0)
+  const [pct, setPct] = useState(0)
+
+  useEffect(() => {
+    if (!frete) return
+    const update = () => {
+      const agora = Date.now()
+      const chegaEm = new Date(frete.entrega_em || frete.chega_em).getTime()
+      const inicio = chegaEm - 60*60*1000
+      const meio = inicio + 30*60*1000
+
+      if (agora < meio) {
+        setFase('buscar')
+        setPct(Math.min(50, ((agora-inicio)/(30*60*1000))*50))
+        setSegundos(Math.max(0, Math.ceil((meio-agora)/1000)))
+      } else if (agora < chegaEm) {
+        setFase('fazenda')
+        setPct(50 + Math.min(50, ((agora-meio)/(30*60*1000))*50))
+        setSegundos(Math.max(0, Math.ceil((chegaEm-agora)/1000)))
+      } else {
+        setFase('entregue')
+        setPct(100)
+        onEntregue && onEntregue()
+      }
+    }
+    update()
+    const iv = setInterval(update, 1000)
+    return () => clearInterval(iv)
+  }, [frete, onEntregue])
+
+  const mins = Math.floor(segundos/60)
+  const secs = segundos%60
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'#7060a0', marginBottom:6 }}>
+        <span>{fase==='buscar'?'🚛 Indo buscar o gado...':'🐄 Gado indo para fazenda...'}</span>
+        <span style={{ color:'#a080ff', fontWeight:600 }}>{mins}:{String(secs).padStart(2,'0')}</span>
+      </div>
+      <div style={{ background:'rgba(255,255,255,.05)', borderRadius:4, height:6, overflow:'hidden' }}>
+        <div style={{ width:`${pct}%`, height:'100%', background:'linear-gradient(90deg,#4060d0,#8040c0)', borderRadius:4, transition:'width 1s linear' }}/>
+      </div>
+    </div>
+  )
+}
+
+// ─── Concessionaria Page ──────────────────────────────────────────────────────
+export function ConcessionariaPage({ T, user, api, notify, sounds }) {
+  const [modelos, setModelos] = useState([])
+  const [pedidos, setPedidos] = useState([])
+  const [meusPedidos, setMeusPedidos] = useState([])
+  const [comprovante, setComprovante] = useState('')
+  const [modeloSel, setModeloSel] = useState(null)
+  const [step, setStep] = useState(1)
+
+  const load = useCallback(async () => {
+    const m = await fetch('/api/concessionaria').then(r=>r.json())
+    setModelos(Array.isArray(m)?m:[])
+    if (user?.role === 'admin') {
+      const p = await api('/api/concessionaria?tipo=pedidos')
+      setPedidos(Array.isArray(p)?p:[])
+    }
+  }, [user, api])
+
+  useEffect(() => { load() }, [load])
+
+  async function comprarCaminhao() {
+    if (!comprovante) return notify('Cole o comprovante!', 'danger')
+    const r = await api('/api/concessionaria', {
+      method: 'POST',
+      body: JSON.stringify({ modelo_id: modeloSel.id, comprovante })
+    })
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.coin()
+    setStep(3); load()
+  }
+
+  const pedidosPend = pedidos.filter(p => p.status === 'pendente')
+
+  return (
+    <div>
+      <div style={{ marginBottom:28, paddingBottom:16, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
+          <span style={{ fontSize:24 }}>🏢</span>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Concessionária</h1>
+        </div>
+        <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Compre seu caminhão e entre no mercado de fretes</p>
+      </div>
+
+      {user?.role === 'admin' && pedidosPend.length > 0 && (
+        <div style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:18, marginBottom:20 }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:T.text, marginBottom:14 }}>
+            Pedidos pendentes <Badge type="amber">{pedidosPend.length}</Badge>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {pedidosPend.map(p => (
+              <div key={p.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:T.inputBg, borderRadius:10, border:`1px solid ${T.border2}`, flexWrap:'wrap' }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:T.text }}>{p.jogador_nome}</div>
+                  <div style={{ fontSize:12, color:T.textMuted }}>{p.modelo_nome} · ${fmt(p.valor)}</div>
+                  {p.comprovante && <a href={p.comprovante} target="_blank" rel="noreferrer" style={{ fontSize:11, color:'#4a90d0' }}>Ver comprovante →</a>}
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={async()=>{await api('/api/concessionaria',{method:'PATCH',body:JSON.stringify({id:p.id,status:'aprovado'})});sounds?.success();notify('✓ Caminhão entregue!');load()}} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>✓ Entregar</button>
+                  <button onClick={async()=>{await api('/api/concessionaria',{method:'PATCH',body:JSON.stringify({id:p.id,status:'recusado'})});notify('Recusado.');load()}} style={{ padding:'6px 10px', background:'#3a0808', color:'#e06060', border:'1px solid #6a1818', borderRadius:8, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>✗</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === 3 ? (
+        <div style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:48, textAlign:'center', maxWidth:480, margin:'0 auto' }}>
+          <div style={{ fontSize:56, marginBottom:16 }}>🚛</div>
+          <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, color:'#a080ff', marginBottom:10 }}>Pedido enviado!</h2>
+          <p style={{ fontSize:14, color:T.textMuted, lineHeight:1.8, marginBottom:20 }}>O admin irá verificar seu comprovante e entregar o caminhão na sua garagem.</p>
+          <button onClick={()=>{setStep(1);setModeloSel(null);setComprovante('')}} style={{ padding:'9px 20px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Ver outro modelo</button>
+        </div>
+      ) : step === 2 && modeloSel ? (
+        <div style={{ maxWidth:480, margin:'0 auto' }}>
+          <div style={{ background:T.card, border:'1px solid #3020a0', borderRadius:14, padding:24, marginBottom:16 }}>
+            <div style={{ display:'flex', gap:16, alignItems:'center', marginBottom:16 }}>
+              <span style={{ fontSize:40 }}>🚛</span>
+              <div>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:T.text }}>{modeloSel.modelo}</div>
+                <div style={{ fontSize:12, color:T.textMuted }}>{modeloSel.capacidade} cabeças máx · ${fmt(modeloSel.preco)}</div>
+              </div>
+            </div>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:8 }}>Link do comprovante (Discord)</label>
+              <input value={comprovante} onChange={e=>setComprovante(e.target.value)} placeholder="https://discord.com/channels/..." style={{ width:'100%', background:T.inputBg, border:`1px solid ${T.border2}`, borderRadius:10, padding:'10px 14px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={()=>setStep(1)} style={{ flex:1, padding:10, background:'transparent', border:`1px solid ${T.border2}`, color:T.textDim, borderRadius:10, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Voltar</button>
+              <button onClick={comprarCaminhao} style={{ flex:2, padding:10, background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar — ${fmt(modeloSel.preco)}</button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:16 }}>
+          {modelos.map(m => (
+            <div key={m.id} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, overflow:'hidden', transition:'all .25s', cursor:'pointer' }}
+              onMouseEnter={e=>{e.currentTarget.style.border='1px solid #5030c0';e.currentTarget.style.transform='translateY(-4px)'}}
+              onMouseLeave={e=>{e.currentTarget.style.border=`1px solid ${T.border}`;e.currentTarget.style.transform='translateY(0)'}}>
+              <div style={{ height:160, overflow:'hidden', background:'#0a0808', position:'relative' }}>
+                <img src={m.foto_url} alt={m.modelo} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.75)' }} onError={e=>e.target.style.display='none'}/>
+                <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.7),transparent 50%)' }}/>
+                <div style={{ position:'absolute', bottom:10, left:14 }}>
+                  <span style={{ background:'rgba(10,8,24,.85)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
+                    🐄 {m.capacidade} cab. máx
+                  </span>
+                </div>
+              </div>
+              <div style={{ padding:'16px 18px' }}>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:T.text, marginBottom:4 }}>{m.modelo}</div>
+                <div style={{ fontSize:12, color:T.textMuted, marginBottom:12, lineHeight:1.6 }}>{m.descricao}</div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <div style={{ fontSize:22, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(m.preco)}</div>
+                  <button onClick={()=>{setModeloSel(m);setStep(2)}} style={{ padding:'8px 16px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Badge({ type, children }) {
+  const s = { amber:['#3a2000','#e09030','#6a3800'], ok:['#0a2010','#4ad4a0','#1a5a30'] }[type]||['#2a2018','#9a8060','#4a3020']
+  return <span style={{ background:s[0], color:s[1], border:`1px solid ${s[2]}`, fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600, marginLeft:8 }}>{children}</span>
+}
