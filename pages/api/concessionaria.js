@@ -3,9 +3,9 @@ import { verifyToken, getTokenFromReq } from '../../lib/auth'
 
 // Seed de modelos padrão
 const MODELOS_PADRAO = [
-  { modelo:'Truck Pequeno', descricao:'Ideal para pequenos criadores. Capacidade reduzida mas ágil.', capacidade:30, preco:15000, foto_url:'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=400&q=80' },
-  { modelo:'Truck Médio', descricao:'O mais popular do servidor. Bom custo-benefício.', capacidade:60, preco:28000, foto_url:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80' },
-  { modelo:'Carretão', descricao:'Para grandes fazendas. Máxima capacidade por viagem.', capacidade:120, preco:55000, foto_url:'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=400&q=80' },
+  { modelo:'Truck Pequeno', descricao:'Ideal para pequenos criadores. Capacidade reduzida mas ágil.', capacidade:30, preco:90000, foto_url:'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=400&q=80' },
+  { modelo:'Truck Médio', descricao:'O mais popular do servidor. Bom custo-benefício.', capacidade:60, preco:168000, foto_url:'/truck_medio.jpg' },
+  { modelo:'Carretão', descricao:'Para grandes fazendas. Máxima capacidade por viagem.', capacidade:120, preco:330000, foto_url:'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=400&q=80' },
 ]
 
 export default async function handler(req, res) {
@@ -16,9 +16,11 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { tipo } = req.query
 
-    // Seed se vazio
-    const { data: exist } = await query(`SELECT id FROM concessionaria_estoque LIMIT 1`, [])
-    if (!exist?.length) {
+    // Seed/update models
+    const { data: exist } = await query(`SELECT id FROM concessionaria_estoque WHERE preco < 50000 LIMIT 1`, [])
+    if (exist?.length) { await query(`DELETE FROM concessionaria_estoque`, []) }
+    const { data: existOk } = await query(`SELECT id FROM concessionaria_estoque LIMIT 1`, [])
+    if (!existOk?.length) {
       for (const m of MODELOS_PADRAO) {
         await query(
           `INSERT INTO concessionaria_estoque (modelo, descricao, capacidade, preco, foto_url) VALUES ($1,$2,$3,$4,$5)`,

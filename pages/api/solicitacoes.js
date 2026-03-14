@@ -98,14 +98,17 @@ export default async function handler(req, res) {
          `Lote ${codigo} criado com ${solic.quantidade} bezerros. Ração para a fase bezerro (${racaoBezerro}kg) já creditada. Compre ração no Celeiro para as próximas fases.`]
       )
 
-      // Frete interno — 30min buscar + 30min entregar
-      const buscaEm = new Date(Date.now() + 30 * 60 * 1000)
-      const chegaEm = new Date(Date.now() + 60 * 60 * 1000)
+      // Frete interno — 30min saindo da transportadora + 30min indo à fazenda = 1h
+      const buscaEm = new Date(Date.now() + 30 * 60 * 1000)  // chega ao curral
+      const chegaEm = new Date(Date.now() + 60 * 60 * 1000)  // chega na fazenda
       await query(
-        `INSERT INTO frete (lote_id, jogador_id, fazenda_id, status, chega_em)
-         VALUES ($1,$2,$3,'em_rota_buscar',$4)`,
-        [lote.id, solic.jogador_id, solic.fazenda_id || null, chegaEm.toISOString()]
+        `INSERT INTO frete (lote_id, jogador_id, fazenda_id, status, chega_em, busca_em)
+         VALUES ($1,$2,$3,'em_rota_buscar',$4,$5)`,
+        [lote.id, solic.jogador_id, solic.fazenda_id || null, chegaEm.toISOString(), buscaEm.toISOString()]
       )
+
+      // Marcar lote como em_transito até frete chegar
+      await query(`UPDATE lotes SET status='em_transito' WHERE id=$1`, [lote.id])
 
       // Criar frete na transportadora — $10/cab
       const valorFrete = solic.quantidade * 10

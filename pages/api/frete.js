@@ -43,6 +43,14 @@ export default async function handler(req, res) {
     const { data } = await queryOne(
       `UPDATE frete SET status=$1 WHERE id=$2 RETURNING *`, [status, id]
     )
+    // When delivered, set lote to ativo
+    if (status === 'entregue' && data?.lote_id) {
+      await query(`UPDATE lotes SET status='ativo' WHERE id=$1`, [data.lote_id])
+      await query(
+        `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+        [data.jogador_id, '🐄 Bezerros chegaram!', 'Seu gado foi entregue na fazenda e já está no seu rebanho!']
+      )
+    }
     return res.json(data)
   }
 
