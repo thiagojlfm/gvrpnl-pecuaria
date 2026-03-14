@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   // POST — jogador solicita compra de caminhão
   if (req.method === 'POST') {
     const { modelo_id, comprovante } = req.body
-    const { data: modelo } = await queryOne(`SELECT * FROM concessionaria_estoque WHERE id=$1`, [modelo_id])
+    const { data: modelo } = await queryOne(`SELECT * FROM concessionaria_estoque WHERE id=$1`, [parseInt(modelo_id)])
     if (!modelo) return res.status(404).json({ error: 'Modelo não encontrado' })
 
     // Check se tabela pedidos_caminhao existe, se não criar inline
