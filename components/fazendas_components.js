@@ -70,7 +70,7 @@ function FreteTracker({ frete, T, onChegou }) {
 function FazendaCard({ fazenda, onClick, T, showBuy }) {
   const [hov, setHov] = useState(false)
   const disponivel = fazenda.status === 'disponivel'
-  const tamanhoLabel = fazenda.tamanho_ha >= 100 ? 'Grande' : fazenda.tamanho_ha >= 50 ? 'Médio' : 'Pequena'
+  const tamanhoLabel = Number(fazenda.tamanho_ha) >= 100 ? 'Grande' : Number(fazenda.tamanho_ha) >= 50 ? 'Médio' : 'Pequena'
 
   return (
     <div
@@ -111,7 +111,7 @@ function FazendaCard({ fazenda, onClick, T, showBuy }) {
             📐 {fazenda.tamanho_ha} ha — {tamanhoLabel}
           </span>
           <span style={{ background:T.inputBg, border:`1px solid ${T.border}`, borderRadius:8, fontSize:11, padding:'3px 8px', color:T.textDim }}>
-            🐄 até {fazenda.tamanho_ha * 3} bezerros
+            🐄 até {Number(fazenda.tamanho_ha) * 3} bezerros
           </span>
           {fazenda.tipologia && (
             <span style={{ background:T.inputBg, border:`1px solid ${T.border}`, borderRadius:8, fontSize:11, padding:'3px 8px', color:T.textDim }}>
@@ -168,7 +168,7 @@ function FazendaModal({ fazenda, onClose, T, user, api, notify, users }) {
     onClose(true)
   }
 
-  const cap = detalhe ? calcCapacidade(detalhe.lotes, fazenda.tamanho_ha) : null
+  const cap = detalhe ? calcCapacidade(detalhe.lotes, Number(fazenda.tamanho_ha)) : null
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
@@ -200,7 +200,7 @@ function FazendaModal({ fazenda, onClose, T, user, api, notify, users }) {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginTop:12 }}>
               {['bezerro','garrote','boi'].map(f => (
                 <div key={f} style={{ textAlign:'center', fontSize:11, color:T.textMuted }}>
-                  <div style={{ fontWeight:600, color:T.text }}>{fazenda.tamanho_ha * CAP_POR_HA[f]}</div>
+                  <div style={{ fontWeight:600, color:T.text }}>{Number(fazenda.tamanho_ha) * CAP_POR_HA[f]}</div>
                   <div>{f === 'bezerro' ? 'Bezerros' : f === 'garrote' ? 'Garrotes' : 'Bois'} máx.</div>
                 </div>
               ))}
@@ -302,7 +302,7 @@ export function FazendasPage({ T, user, api, notify, users }) {
           { label:'Total', value:fazendas.length, icon:'🏡', color:T.text },
           { label:'Disponíveis', value:disponiveis, icon:'✓', color:'#4ad4a0' },
           { label:'Ocupadas', value:fazendas.length - disponiveis, icon:'👤', color:'#a080ff' },
-          { label:'Hectares totais', value:fmt(fazendas.reduce((s,f)=>s+f.tamanho_ha,0)), icon:'📐', color:T.gold },
+          { label:'Hectares totais', value:fmt(fazendas.reduce((s,f)=>s+Number(f.tamanho_ha||0),0)), icon:'📐', color:T.gold },
         ].map(m => (
           <div key={m.label} style={{ background:T.inputBg, borderRadius:12, padding:'14px 16px', border:`1px solid ${T.border}` }}>
             <div style={{ fontSize:10, color:T.textMuted, marginBottom:6, textTransform:'uppercase', letterSpacing:'1px', fontWeight:600 }}>{m.label}</div>
@@ -379,7 +379,7 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
   }, [selectedFaz, api])
 
   const minhasLotes = (lotes||[]).filter(l => l.fazenda_id === selectedFaz?.id)
-  const cap = selectedFaz ? calcCapacidade(minhasLotes, selectedFaz.tamanho_ha) : null
+  const cap = selectedFaz ? calcCapacidade(minhasLotes, Number(selectedFaz.tamanho_ha)) : null
   const vaqueirosNec = Math.floor(minhasLotes.reduce((s,l)=>s+l.quantidade,0) / 60)
   const custosPend = custos.filter(c => c.status === 'pendente').length
 
@@ -484,7 +484,7 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
                 {[['bezerro','🐄 Bezerros','info'],['garrote','🐄 Garrotes','warn'],['boi','🐄 Bois adultos','gold']].map(([f,l,c]) => {
-                  const maxCap = selectedFaz.tamanho_ha * CAP_POR_HA[f]
+                  const maxCap = Number(selectedFaz.tamanho_ha) * CAP_POR_HA[f]
                   const atual = minhasLotes.filter(lot=>lot.fase===f).reduce((s,lot)=>s+lot.quantidade,0)
                   return (
                     <div key={f} style={{ background:T.inputBg, borderRadius:10, padding:'10px 12px', border:`1px solid ${T.border}`, textAlign:'center' }}>
