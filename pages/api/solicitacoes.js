@@ -110,16 +110,27 @@ export default async function handler(req, res) {
       // Marcar lote como em_transito até frete chegar
       await query(`UPDATE lotes SET status='em_transito' WHERE id=$1`, [lote.id])
 
-      // Criar frete na transportadora — $10/cab
-      const valorFrete = solic.quantidade * 10
-      const origem = 'Curral Gov. NPC'
-      const destino = solic.fazenda_id ? `Fazenda ${jogador?.fazenda || solic.jogador_nome}` : 'Fazenda do Jogador'
-      await query(
-        `INSERT INTO fretes_transportadora
-         (lote_id, lote_codigo, origem, destino, quantidade, valor, comprador_id, status, criado_em)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel',now())`,
-        [lote.id, codigo, origem, destino, solic.quantidade, valorFrete, solic.jogador_id]
-      )
+      // Criar frete(s) na transportadora — $10/cab
+      // Se quantidade > capacidade máx de 1 caminhão (120), divide em múltiplos fretes
+      const valorPorCab = 10
+      const origemFrete = 'Curral Gov. NPC'
+      const destinoFrete = solic.fazenda_id ? `Fazenda ${jogador?.fazenda || solic.jogador_nome}` : `Fazenda de ${solic.jogador_nome}`
+      const capMaxCaminhao = 120 // capacidade do maior caminhão
+      let qtdRestante = solic.quantidade
+      let numFretes = 0
+      while (qtdRestante > 0) {
+        const qtdEste = Math.min(qtdRestante, capMaxCaminhao)
+        const valorEste = qtdEste * valorPorCab
+        await query(
+          `INSERT INTO fretes_transportadora
+           (lote_id, lote_codigo, origem, destino, quantidade, valor, comprador_id, status, criado_em)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel',now())`,
+          [lote.id, codigo, origemFrete, destinoFrete, qtdEste, valorEste, solic.jogador_id]
+        )
+        qtdRestante -= qtdEste
+        numFretes++
+      }
+      const valorFreteTotal = solic.quantidade * valorPorCab
 
       // Notificar todos transportadores disponíveis
       const { data: transportadores } = await query(
@@ -128,8 +139,8 @@ export default async function handler(req, res) {
       for (const t of (transportadores||[])) {
         await query(
           `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
-          [t.jogador_id, '🚛 Frete disponível!',
-           `${solic.quantidade} bezerros para transportar — $${valorFrete}. Acesse a Transportadora para aceitar!`]
+          [t.jogador_id, `🚛 ${numFretes > 1 ? numFretes + ' fretes disponíveis!' : 'Frete disponível!'}`,
+           `${solic.quantidade} bezerros para transportar${numFretes > 1 ? ` (${numFretes} caminhões necessários)` : ''} — $${valorFreteTotal} total. Acesse a Transportadora!`]
         )
       }
 

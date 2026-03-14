@@ -1,11 +1,12 @@
 import { query, queryOne } from '../../lib/db'
 import { verifyToken, getTokenFromReq } from '../../lib/auth'
 
-// Frete por cabeça
-const FRETE_POR_CABECA = 10 // $10/cab
+// Frete: cliente paga $50/cab, transportador recebe $30/cab ($20 é combustível)
+const FRETE_CLIENTE = 50
+const FRETE_TRANSPORTADOR = 30
 
 function calcValorFrete(quantidade) {
-  return quantidade * FRETE_POR_CABECA
+  return quantidade * FRETE_TRANSPORTADOR // valor que o transportador recebe
 }
 
 export default async function handler(req, res) {
