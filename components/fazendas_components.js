@@ -1119,14 +1119,7 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:14 }}>
               {caminhoes.map(c => (
-                <div key={c.id} style={{ background:T.card, border:`1px solid ${c.status==='disponivel'?T.border:'#3020a0'}`, borderRadius:14, padding:18 }}>
-                  <div style={{ fontSize:32, marginBottom:10 }}>🚛</div>
-                  <div style={{ fontSize:15, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>{c.modelo}</div>
-                  <div style={{ fontSize:12, color:T.textMuted, marginBottom:8 }}>Placa {c.placa} · {c.capacidade} cab. máx</div>
-                  <span style={{ background:c.status==='disponivel'?'rgba(10,42,10,.8)':'rgba(10,8,24,.8)', border:`1px solid ${c.status==='disponivel'?'#2a5a12':'#3020a0'}`, color:c.status==='disponivel'?'#4ad4a0':'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
-                    {c.status==='disponivel'?'✓ Disponível':'🚛 Em rota'}
-                  </span>
-                </div>
+                <CaminhaoCard key={c.id} caminhao={c} T={T} api={api} notify={notify} onReload={load}/>
               ))}
             </div>
           )}
@@ -1641,6 +1634,66 @@ function AdminTransportadoraPanel({ T, api, notify, sounds, onReload }) {
         </button>
       </div>
 
+    </div>
+  )
+}
+
+// ─── Caminhao Card com edição de nome ────────────────────────────────────────
+function CaminhaoCard({ caminhao: c, T, api, notify, onReload }) {
+  const [editando, setEditando] = useState(false)
+  const [nome, setNome] = useState(c.nome_transportadora || '')
+  const [saving, setSaving] = useState(false)
+
+  async function salvarNome() {
+    setSaving(true)
+    const r = await api('/api/admin/caminhoes', {
+      method: 'PATCH',
+      body: JSON.stringify({ id: c.id, nome_transportadora: nome })
+    })
+    setSaving(false)
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    notify('✓ Nome salvo!')
+    setEditando(false)
+    onReload && onReload()
+  }
+
+  return (
+    <div style={{ background:T.card, border:`1px solid ${c.status==='disponivel'?T.border:'#3020a0'}`, borderRadius:14, padding:18 }}>
+      <div style={{ fontSize:32, marginBottom:10 }}>🚛</div>
+      {editando ? (
+        <div style={{ marginBottom:10 }}>
+          <input
+            value={nome}
+            onChange={e => setNome(e.target.value)}
+            placeholder="Ex: Transportadora Silva"
+            autoFocus
+            onKeyDown={e => e.key === 'Enter' && salvarNome()}
+            style={{ width:'100%', background:T.inputBg, border:`1px solid #5030c0`, borderRadius:8, padding:'8px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none', marginBottom:6 }}
+          />
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={salvarNome} disabled={saving} style={{ flex:1, padding:'6px 0', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+              {saving ? '...' : 'Salvar'}
+            </button>
+            <button onClick={() => { setEditando(false); setNome(c.nome_transportadora||'') }} style={{ padding:'6px 10px', background:'transparent', border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:8, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+              ✕
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom:6 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
+            <div style={{ fontSize:15, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>
+              {c.nome_transportadora || c.modelo}
+            </div>
+            <button onClick={() => setEditando(true)} style={{ background:'none', border:'none', color:T.textMuted, cursor:'pointer', fontSize:13, padding:0 }}>✏</button>
+          </div>
+          {c.nome_transportadora && <div style={{ fontSize:11, color:T.textMuted, marginBottom:4 }}>{c.modelo}</div>}
+        </div>
+      )}
+      <div style={{ fontSize:12, color:T.textMuted, marginBottom:10 }}>Placa {c.placa} · {c.capacidade} cab. máx</div>
+      <span style={{ background:c.status==='disponivel'?'rgba(10,42,10,.8)':'rgba(10,8,24,.8)', border:`1px solid ${c.status==='disponivel'?'#2a5a12':'#3020a0'}`, color:c.status==='disponivel'?'#4ad4a0':'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
+        {c.status==='disponivel'?'✓ Disponível':'🚛 Em rota'}
+      </span>
     </div>
   )
 }

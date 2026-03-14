@@ -730,7 +730,7 @@ export default function App() {
                   <div style={{display:'flex',flexDirection:'column',gap:14,marginBottom:18}}>
                     <Inp T={T} label="Usuário" value={regForm.username} onChange={e=>setRegForm(f=>({...f,username:e.target.value}))} placeholder="nome_no_servidor"/>
                     <Inp T={T} label="Senha" type="password" value={regForm.password} onChange={e=>setRegForm(f=>({...f,password:e.target.value}))} placeholder="mínimo 6 caracteres"/>
-                    <Inp T={T} label="Fazenda (opcional)" value={regForm.fazenda} onChange={e=>setRegForm(f=>({...f,fazenda:e.target.value}))} placeholder="Ex: 0325"/>
+
                   </div>
                   {regErr&&<Alrt type="danger">{regErr}</Alrt>}
                   <Btn onClick={register} T={T} style={{width:'100%',padding:12,fontSize:14}}>Solicitar cadastro</Btn>

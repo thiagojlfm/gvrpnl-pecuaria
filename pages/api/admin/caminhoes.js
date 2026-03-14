@@ -17,6 +17,18 @@ export default async function handler(req, res) {
     return res.json(data || [])
   }
 
+  // PATCH — atualizar nome da transportadora
+  if (req.method === 'PATCH') {
+    const { id, nome_transportadora } = req.body
+    if (!id) return res.status(400).json({ error: 'ID obrigatório' })
+    const { data, error } = await queryOne(
+      `UPDATE caminhoes SET nome_transportadora=$1 WHERE id=$2 AND jogador_id=$3 RETURNING *`,
+      [nome_transportadora, id, user.id]
+    )
+    if (error) return res.status(500).json({ error: error.message })
+    return res.json(data)
+  }
+
   // DELETE — apagar caminhão específico
   if (req.method === 'DELETE') {
     const { id } = req.body
