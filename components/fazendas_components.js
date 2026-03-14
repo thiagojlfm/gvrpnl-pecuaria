@@ -991,12 +991,19 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
 
   return (
     <div>
-      <div style={{ marginBottom:28, paddingBottom:16, borderBottom:`1px solid ${T.border}` }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
-          <span style={{ fontSize:24 }}>🚛</span>
-          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Transportadora</h1>
+      <div style={{ marginBottom:28, paddingBottom:16, borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
+            <span style={{ fontSize:24 }}>🚛</span>
+            <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Transportadora</h1>
+          </div>
+          <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Aceite fretes, gerencie sua frota e receba por cada entrega</p>
         </div>
-        <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Aceite fretes, gerencie sua frota e receba por cada entrega</p>
+        {user?.role === 'admin' && (
+          <button onClick={async()=>{if(!confirm('Resetar toda a transportadora? Fretes serão apagados e caminhões liberados.')) return; const r=await api('/api/transportadora',{method:'DELETE'}); if(r.ok){notify('✓ Transportadora resetada!');load()}}} style={{ padding:'7px 14px', background:'#3a0808', color:'#e06060', border:'1px solid #6a1818', borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            🗑 Resetar transportadora
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -1178,14 +1185,21 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
                 <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:8 }}>Selecionar caminhão</label>
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {caminhoesLivres.map(c => (
-                    <button key={c.id} onClick={() => setCaminhaoSel(c.id.toString())} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:caminhaoSel===c.id.toString()?'rgba(80,48,192,.2)':T.inputBg, border:`1px solid ${caminhaoSel===c.id.toString()?'#5030c0':T.border}`, borderRadius:10, cursor:'pointer', fontFamily:'inherit', transition:'all .15s', textAlign:'left' }}>
-                      <span style={{ fontSize:20 }}>🚛</span>
-                      <div>
-                        <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{c.modelo}</div>
-                        <div style={{ fontSize:11, color:T.textMuted }}>Placa {c.placa} · {c.capacidade} cab. máx</div>
-                      </div>
-                      {caminhaoSel===c.id.toString()&&<span style={{ marginLeft:'auto', color:'#a080ff', fontSize:16 }}>✓</span>}
-                    </button>
+                    {(() => {
+                      const insuf = c.capacidade < aceitando.quantidade
+                      const caminhoeNec = Math.ceil(aceitando.quantidade / c.capacidade)
+                      return (
+                        <button key={c.id} onClick={() => !insuf && setCaminhaoSel(c.id.toString())} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:insuf?'rgba(42,10,10,.3)':caminhaoSel===c.id.toString()?'rgba(80,48,192,.2)':T.inputBg, border:`1px solid ${insuf?'#6a1818':caminhaoSel===c.id.toString()?'#5030c0':T.border}`, borderRadius:10, cursor:insuf?'not-allowed':'pointer', fontFamily:'inherit', transition:'all .15s', textAlign:'left', opacity:insuf?.6:1 }}>
+                          <span style={{ fontSize:20 }}>🚛</span>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:13, fontWeight:600, color:insuf?'#e06060':T.text }}>{c.modelo}</div>
+                            <div style={{ fontSize:11, color:T.textMuted }}>Placa {c.placa} · {c.capacidade} cab. máx</div>
+                            {insuf && <div style={{ fontSize:10, color:'#e06060', marginTop:2 }}>⚠ Insuficiente — precisaria de {caminhoeNec} caminhões deste modelo</div>}
+                          </div>
+                          {!insuf && caminhaoSel===c.id.toString()&&<span style={{ marginLeft:'auto', color:'#a080ff', fontSize:16 }}>✓</span>}
+                        </button>
+                      )
+                    })()}
                   ))}
                 </div>
               </div>

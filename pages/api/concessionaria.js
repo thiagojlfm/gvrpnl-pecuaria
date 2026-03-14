@@ -3,9 +3,9 @@ import { verifyToken, getTokenFromReq } from '../../lib/auth'
 
 // Seed de modelos padrão
 const MODELOS_PADRAO = [
-  { modelo:'Truck Pequeno', descricao:'Ideal para pequenos criadores. Capacidade reduzida mas ágil.', capacidade:30, preco:90000, foto_url:'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=400&q=80' },
-  { modelo:'Truck Médio', descricao:'O mais popular do servidor. Bom custo-benefício.', capacidade:60, preco:168000, foto_url:'/truck_medio.jpg' },
-  { modelo:'Carretão', descricao:'Para grandes fazendas. Máxima capacidade por viagem.', capacidade:120, preco:330000, foto_url:'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=400&q=80' },
+  { modelo:'Truck Pequeno', descricao:'Ideal para pequenos criadores. Capacidade reduzida mas ágil.', capacidade:30, preco:80000, foto_url:'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=400&q=80' },
+  { modelo:'Truck Médio', descricao:'O mais popular do servidor. Bom custo-benefício.', capacidade:60, preco:150000, foto_url:'/truck_medio.jpg' },
+  { modelo:'Carretão', descricao:'Para grandes fazendas. Máxima capacidade por viagem.', capacidade:120, preco:210000, foto_url:'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=400&q=80' },
 ]
 
 export default async function handler(req, res) {
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     const { tipo } = req.query
 
     // Seed/update models
-    const { data: exist } = await query(`SELECT id FROM concessionaria_estoque WHERE preco < 50000 LIMIT 1`, [])
+    const { data: exist } = await query(`SELECT id FROM concessionaria_estoque WHERE preco < 80000 LIMIT 1`, [])
     if (exist?.length) { await query(`DELETE FROM concessionaria_estoque`, []) }
     const { data: existOk } = await query(`SELECT id FROM concessionaria_estoque LIMIT 1`, [])
     if (!existOk?.length) {

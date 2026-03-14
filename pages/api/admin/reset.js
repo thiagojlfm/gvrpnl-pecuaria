@@ -33,10 +33,14 @@ export default async function handler(req, res) {
     if (tipo === 'rebanho_completo') {
       await query(`DELETE FROM chat_anuncios`, [])
       await query(`DELETE FROM anuncios`, [])
-      await query(`DELETE FROM transacoes`, [])
+      await query(`DELETE FROM transacoes`, [])        // limpa ranking
       await query(`DELETE FROM lotes`, [])
       await query(`DELETE FROM solicitacoes`, [])
+      await query(`DELETE FROM pedidos_racao`, [])
+      await query(`DELETE FROM fretes_transportadora`, [])
+      await query(`DELETE FROM frete`, [])
       await query(`UPDATE estoque_racao SET kg_disponivel = 0`, [])
+      await query(`UPDATE caminhoes SET status='disponivel'`, []) // libera caminhões
       return res.json({ ok: true, msg: 'Rebanho resetado' })
     }
 

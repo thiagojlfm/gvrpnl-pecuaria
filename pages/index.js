@@ -497,6 +497,8 @@ export default function App() {
   const [confirmReset, setConfirmReset] = useState(false)
   const [dividirLote, setDividirLote] = useState(null)
   const [dividirQtd, setDividirQtd] = useState('')
+  const [viewProfile, setViewProfile] = useState(null)
+  const [profileData, setProfileData] = useState(null)
   const [nLote, setNLote] = useState({jogador_id:'',jogador_nome:'',fazenda:'',fazenda_id:'',quantidade:1,valor_compra:1100,data_compra:'',comprovante:''})
   const [nUser, setNUser] = useState({username:'',password:'',fazenda:''})
   const [nAnuncio, setNAnuncio] = useState({lote_id:'',preco_pedido:'',obs:''})
@@ -1076,6 +1078,7 @@ export default function App() {
                   <Btn v="red" T={T} onClick={async()=>{const r=await api('/api/admin/reset',{method:'POST',body:JSON.stringify({tipo:'rebanho_completo'})});if(r.ok){notify('✓ Resetado!');reload();setConfirmReset(false)}}}>✓ Confirmar reset</Btn>
                   <Btn v="ghost" T={T} onClick={()=>setConfirmReset(false)}>Cancelar</Btn>
                 </>:<Btn v="danger" T={T} onClick={()=>setConfirmReset(true)} style={{fontSize:12}}>🗑 Resetar rebanho</Btn>}
+                <Btn v="amber" T={T} onClick={async()=>{const r=await api('/api/admin/reset_transportadora',{method:'POST'});if(r.ok) notify('✓ Transportadora resetada! Caminhões liberados.')}} style={{fontSize:12}}>🚛 Reset transportadora</Btn>
               </div>
             </div>
 
@@ -1187,7 +1190,7 @@ export default function App() {
                 rows={users.filter(u=>u.status!=='pendente').map(u=>[
                   <span style={{fontWeight:600}}>{u.username}</span>,u.fazenda||'—',
                   <Badge type={u.status==='aprovado'||u.role==='admin'?'ok':'danger'}>{u.role==='admin'?'admin':u.status||'aprovado'}</Badge>,
-                  u.role!=='admin'?<Btn T={T} v="ghost" onClick={()=>{setEditTarget(u);setEditPerfil({fazenda:u.fazenda||'',foto_url:u.foto_url||'',bio:u.bio||'',nova_senha:''})}} style={{padding:'4px 8px',fontSize:11}}>✏ Editar</Btn>:'—',
+                  <div style={{display:'flex',gap:4}}>{u.role!=='admin'?<Btn T={T} v="ghost" onClick={()=>{setEditTarget(u);setEditPerfil({fazenda:u.fazenda||'',foto_url:u.foto_url||'',bio:u.bio||'',nova_senha:''})}} style={{padding:'4px 8px',fontSize:11}}>✏ Editar</Btn>:''}<Btn T={T} v="ghost" onClick={()=>{setViewProfile(u.username);setProfileData({...u,stats:{total_abates:0,total_cabecas:0,total_ganho:0}})}} style={{padding:'4px 8px',fontSize:11}}>👤</Btn></div>,
                   u.role!=='admin'?<Btn T={T} v="danger" onClick={async()=>{await api('/api/admin/usuarios',{method:'DELETE',body:JSON.stringify({id:u.id})});api('/api/admin/usuarios').then(setUsers)}} style={{padding:'4px 8px',fontSize:11}}>✕</Btn>:'—'
                 ])}/>
             </Card>
@@ -1251,6 +1254,36 @@ export default function App() {
           {page==='concessionaria'&&<ConcessionariaPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}
 
           {page==='hist'&&user?.role!=='admin'&&<Alrt type="danger">Acesso restrito — apenas administradores.</Alrt>}
+
+          {/* Profile Modal */}
+          {viewProfile&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16,backdropFilter:'blur(4px)'}}>
+            <div style={{background:T.card,border:`1px solid ${T.border2}`,borderRadius:20,padding:32,width:'100%',maxWidth:400,boxShadow:'0 30px 80px rgba(0,0,0,.4)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+                <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:T.text}}>👤 Perfil do Jogador</h3>
+                <button onClick={()=>{setViewProfile(null);setProfileData(null)}} style={{background:'none',border:'none',color:T.textMuted,fontSize:22,cursor:'pointer'}}>×</button>
+              </div>
+              <div style={{textAlign:'center',marginBottom:20}}>
+                <div style={{width:72,height:72,borderRadius:'50%',overflow:'hidden',margin:'0 auto 12px',border:`2px solid ${T.gold}`,background:T.inputBg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>
+                  {profileData?.foto_url?<img src={profileData.foto_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:'🐄'}
+                </div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:T.text}}>{viewProfile}</div>
+                {profileData?.fazenda&&<div style={{fontSize:12,color:T.textMuted}}>Fazenda {profileData.fazenda}</div>}
+                {profileData?.bio&&<div style={{fontSize:13,color:T.textDim,marginTop:8,lineHeight:1.6}}>{profileData.bio}</div>}
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+                {[
+                  {label:'Abates',value:profileData?.stats?.total_abates||ranking.find(r=>r.nome===viewProfile)?.total_abates||0},
+                  {label:'Cabeças',value:fmt(profileData?.stats?.total_cabecas||ranking.find(r=>r.nome===viewProfile)?.total_cabecas||0)},
+                  {label:'Ganho total',value:`$${fmt(profileData?.stats?.total_ganho||ranking.find(r=>r.nome===viewProfile)?.total_ganho||0)}`},
+                ].map(m=>(
+                  <div key={m.label} style={{background:T.inputBg,borderRadius:10,padding:'12px 10px',border:`1px solid ${T.border}`,textAlign:'center'}}>
+                    <div style={{fontSize:10,color:T.textMuted,marginBottom:4,textTransform:'uppercase',letterSpacing:'.5px'}}>{m.label}</div>
+                    <div style={{fontSize:16,fontWeight:700,color:T.gold,fontFamily:"'Playfair Display',serif"}}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>}
 
         </div>
       </div>

@@ -85,6 +85,20 @@ export default async function handler(req, res) {
     )
     if (!caminhao) return res.status(400).json({ error: 'Caminhão não disponível' })
 
+    // Verificar capacidade — caminhão deve ter capacidade >= quantidade do frete
+    if (caminhao.capacidade < frete.quantidade) {
+      return res.status(400).json({
+        error: `Caminhão com capacidade insuficiente! Este frete tem ${frete.quantidade} cabeças mas seu caminhão comporta apenas ${caminhao.capacidade}. Você precisaria de ${Math.ceil(frete.quantidade / caminhao.capacidade)} caminhão(ões) deste modelo.`
+      })
+    }
+
+    // Verificar capacidade
+    if (frete.quantidade > caminhao.capacidade) {
+      return res.status(400).json({
+        error: `Caminhão não comporta ${frete.quantidade} cabeças! Capacidade máxima: ${caminhao.capacidade}. Este frete precisa de um caminhão maior.`
+      })
+    }
+
     const agora = new Date()
     const chegaBuscar = new Date(agora.getTime() + 30 * 60 * 1000) // 30min indo buscar
     const chegaFazenda = new Date(agora.getTime() + 60 * 60 * 1000) // 60min total (chegou na fazenda)
@@ -161,6 +175,17 @@ export default async function handler(req, res) {
     }
 
     return res.status(400).json({ error: 'Parâmetros inválidos' })
+  }
+
+  // DELETE — admin reseta transportadora
+  if (req.method === 'DELETE') {
+    if (!user || user.role !== 'admin') return res.status(403).json({ error: 'Sem permissão' })
+    await query(`UPDATE caminhoes SET status='disponivel'`, [])
+    await query(`DELETE FROM fretes_transportadora`, [])
+    await query(`DELETE FROM pedidos_caminhao WHERE status='pendente'`, [])
+    await query(`INSERT INTO admin_log (admin_nome, acao, detalhes) VALUES ($1,$2,$3)`,
+      [user.username, 'Transportadora resetada', 'Todos os fretes removidos, caminhões liberados'])
+    return res.json({ ok: true })
   }
 
   res.status(405).end()
