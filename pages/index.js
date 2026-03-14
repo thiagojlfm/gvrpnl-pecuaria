@@ -434,7 +434,7 @@ function Drawer({open, onClose, page, setPage, user, T}) {
   if(!open) return null
   return <>
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,backdropFilter:'blur(2px)'}}/>
-    <div className="drawer-open" style={{position:'fixed',top:0,left:0,width:260,height:'100vh',background:T.navBg,borderRight:`1px solid ${T.border2}`,zIndex:310,display:'flex',flexDirection:'column',padding:'20px 12px',gap:4}}>
+    <div className="drawer-open" style={{position:'fixed',top:0,left:0,width:260,height:'100vh',background:T.navBg,borderRight:`1px solid ${T.border2}`,zIndex:310,display:'flex',flexDirection:'column',padding:'20px 12px 40px',gap:4,overflowY:'auto'}}>
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,paddingBottom:16,borderBottom:`1px solid ${T.border}`}}>
         <div style={{width:36,height:36,borderRadius:8,overflow:'hidden'}}><img src="/logo.png" alt="GVRPNL" style={{width:'100%',height:'100%',objectFit:'cover'}}/></div>
         <div>
