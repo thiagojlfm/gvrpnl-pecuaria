@@ -1,4 +1,4 @@
-import { FazendasPage, MinhaFazendaPage } from '../components/fazendas_components'
+import { FazendasPage, MinhaFazendaPage, CeleiroPage } from '../components/fazendas_components'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Head from 'next/head'
 
@@ -404,6 +404,7 @@ const NAV_ITEMS = [
   {id:'venda',icon:'🤝',label:'Venda',pub:false},
   {id:'fazendas',icon:'🏡',label:'Fazendas',pub:true},
   {id:'minha_fazenda',icon:'🌾',label:'Minha Fazenda',pub:false},
+  {id:'celeiro',icon:'🏚',label:'Celeiro',pub:false},
   {id:'ranking',icon:'🏆',label:'Ranking',pub:true},
   {id:'ajuda',icon:'❓',label:'Ajuda',pub:true},
   {id:'perfil',icon:'👤',label:'Perfil',pub:false},
@@ -492,6 +493,8 @@ export default function App() {
   const [compraComp, setCompraComp] = useState('')
   const [compraStep, setCompraStep] = useState(1)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [dividirLote, setDividirLote] = useState(null)
+  const [dividirQtd, setDividirQtd] = useState('')
   const [nLote, setNLote] = useState({jogador_id:'',jogador_nome:'',fazenda:'',fazenda_id:'',quantidade:1,valor_compra:1100,data_compra:'',comprovante:''})
   const [nUser, setNUser] = useState({username:'',password:'',fazenda:''})
   const [nAnuncio, setNAnuncio] = useState({lote_id:'',preco_pedido:'',obs:''})
@@ -898,6 +901,46 @@ export default function App() {
           </>}
 
           {/* VENDA */}
+          {/* Modal dividir lote */}
+          {dividirLote&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16,backdropFilter:'blur(3px)'}}>
+            <div style={{background:T.card,border:`1px solid ${T.border2}`,borderRadius:20,padding:32,width:'100%',maxWidth:380,boxShadow:'0 30px 80px rgba(0,0,0,.4)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+                <div>
+                  <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:T.text}}>✂ Dividir Lote</h3>
+                  <div style={{fontSize:12,color:T.textMuted}}>{dividirLote.codigo} — {dividirLote.quantidade} cabeças</div>
+                </div>
+                <button onClick={()=>setDividirLote(null)} style={{background:'none',border:'none',color:T.textMuted,fontSize:22,cursor:'pointer'}}>×</button>
+              </div>
+              <div style={{background:T.inputBg,borderRadius:12,padding:16,marginBottom:16,border:`1px solid ${T.border}`}}>
+                <div style={{fontSize:12,color:T.textMuted,marginBottom:12}}>O lote original será <strong style={{color:'#e06060'}}>deletado</strong> e dois novos serão criados.</div>
+                <Inp T={T} label={`Qtd. no Lote A (máx ${dividirLote.quantidade-1})`} type="number" value={dividirQtd} onChange={e=>setDividirQtd(e.target.value)} placeholder={Math.floor(dividirLote.quantidade/2)}/>
+                {dividirQtd&&parseInt(dividirQtd)>0&&parseInt(dividirQtd)<dividirLote.quantidade&&<div style={{marginTop:12,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <div style={{background:T.card,borderRadius:8,padding:10,border:`1px solid ${T.border}`,textAlign:'center'}}>
+                    <div style={{fontSize:11,color:T.textMuted}}>Lote A</div>
+                    <div style={{fontSize:18,fontWeight:700,color:T.text,fontFamily:"'Playfair Display',serif"}}>{parseInt(dividirQtd)} cab.</div>
+                  </div>
+                  <div style={{background:T.card,borderRadius:8,padding:10,border:`1px solid ${T.border}`,textAlign:'center'}}>
+                    <div style={{fontSize:11,color:T.textMuted}}>Lote B</div>
+                    <div style={{fontSize:18,fontWeight:700,color:T.text,fontFamily:"'Playfair Display',serif"}}>{dividirLote.quantidade-parseInt(dividirQtd)} cab.</div>
+                  </div>
+                </div>}
+              </div>
+              <div style={{display:'flex',gap:10}}>
+                <Btn T={T} v="ghost" onClick={()=>setDividirLote(null)} style={{flex:1}}>Cancelar</Btn>
+                <Btn T={T} onClick={async()=>{
+                  const qtd=parseInt(dividirQtd)
+                  if(!qtd||qtd<=0||qtd>=dividirLote.quantidade) return notify('Quantidade inválida','danger')
+                  const r=await api(`/api/lotes/${dividirLote.id}`,{method:'PATCH',body:JSON.stringify({action:'dividir',quantidade_a:qtd})})
+                  if(r.error) return notify('Erro: '+r.error,'danger')
+                  sounds.success()
+                  notify(`✓ Lote dividido — ${dividirLote.codigo}-A e ${dividirLote.codigo}-B criados!`)
+                  setDividirLote(null)
+                  api('/api/lotes').then(setLotes)
+                }} style={{flex:2}} disabled={!dividirQtd||parseInt(dividirQtd)<=0||parseInt(dividirQtd)>=dividirLote.quantidade}>✂ Dividir</Btn>
+              </div>
+            </div>
+          </div>}
+
           {page==='venda'&&<>
             <SectionTitle T={T} icon="🤝" title="Venda entre Jogadores" sub="Garrote e Boi · preço livre · chat ao vivo por anúncio"/>
             <Alrt type="info">💬 Clique em <strong>Negociar</strong> para abrir o chat ao vivo e fazer sua oferta diretamente ao vendedor.</Alrt>
@@ -1201,6 +1244,7 @@ export default function App() {
           {/* ── FAZENDAS ── */}
           {page==='fazendas'&&<FazendasPage T={T} user={user} api={api} notify={notify} users={users}/>}
           {page==='minha_fazenda'&&<MinhaFazendaPage T={T} user={user} api={api} notify={notify} lotes={lotes} mercado={mercado}/>}
+          {page==='celeiro'&&<CeleiroPage T={T} user={user} api={api} notify={notify} mercado={mercado} sounds={sounds}/>}
 
           {page==='hist'&&user?.role!=='admin'&&<Alrt type="danger">Acesso restrito — apenas administradores.</Alrt>}
 

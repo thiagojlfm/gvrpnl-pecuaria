@@ -3,12 +3,17 @@ import { useState, useEffect, useCallback } from 'react'
 const fmt = n => Number(n||0).toLocaleString('pt-BR')
 const CAP_POR_HA = { bezerro: 3, garrote: 2, boi: 1, abatido: 1 }
 const TIPOS_CUSTO = [
-  { tipo:'cerca', label:'Reforma de Cerca', emoji:'🪨' },
-  { tipo:'vacina', label:'Vacinação', emoji:'💉' },
-  { tipo:'pasto', label:'Limpeza de Pasto', emoji:'🌿' },
-  { tipo:'bebedouro', label:'Reparo de Bebedouro', emoji:'💧' },
-  { tipo:'vaqueiro', label:'Vaqueiro', emoji:'👨‍🌾' },
-  { tipo:'veterinario', label:'Veterinário', emoji:'🩺' },
+  { tipo:'cerca', label:'Reforma de Cerca', emoji:'🪨', urgente: false, desc:'Manutenção preventiva das cercas do pasto' },
+  { tipo:'cerca_quebrada', label:'🔴 Cerca Quebrada', emoji:'🚨', urgente: true, desc:'URGENTE — risco de fuga do gado! Contratar peão para reparo imediato.' },
+  { tipo:'energia', label:'🔴 Falta de Energia', emoji:'⚡', urgente: true, desc:'URGENTE — bebedouros parados, gado sem água. Chamar eletricista.' },
+  { tipo:'alagamento', label:'🔴 Alagamento do Pasto', emoji:'🌊', urgente: true, desc:'URGENTE — pasto alagado, gado sem área. Providenciar drenagem.' },
+  { tipo:'pragas', label:'🔴 Infestação de Pragas', emoji:'🐛', urgente: true, desc:'URGENTE — risco de doença no rebanho. Chamar veterinário imediato.' },
+  { tipo:'poco_seco', label:'🔴 Poço Seco', emoji:'💧', urgente: true, desc:'URGENTE — sem água para o gado. Chamar perfurador de poço.' },
+  { tipo:'vacina', label:'Vacinação', emoji:'💉', urgente: false, desc:'Aplicação preventiva de vacinas no rebanho' },
+  { tipo:'pasto', label:'Limpeza de Pasto', emoji:'🌿', urgente: false, desc:'Roçagem e limpeza da área de pastagem' },
+  { tipo:'bebedouro', label:'Reparo de Bebedouro', emoji:'🔧', urgente: false, desc:'Manutenção dos bebedouros' },
+  { tipo:'vaqueiro', label:'Vaqueiro', emoji:'👨‍🌾', urgente: false, desc:'Contratação de vaqueiro (1 por 60 cabeças)' },
+  { tipo:'veterinario', label:'Veterinário', emoji:'🩺', urgente: false, desc:'Visita veterinária ao rebanho' },
 ]
 
 // ─── Capacity Calculator ──────────────────────────────────────────────────────
@@ -597,6 +602,243 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
             )}
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+// ─── Celeiro Page ─────────────────────────────────────────────────────────────
+export function CeleiroPage({ T, user, api, notify, mercado, sounds }) {
+  const [dados, setDados] = useState(null)
+  const [kgSolicitado, setKgSolicitado] = useState('')
+  const [comprovante, setComprovante] = useState('')
+  const [step, setStep] = useState(1) // 1=cotação, 2=comprovante, 3=enviado
+
+  const load = useCallback(async () => {
+    if (!user) return
+    const r = await api('/api/celeiro')
+    setDados(r)
+    if (r?.necessidade?.kgFaltando > 0) {
+      setKgSolicitado(String(Math.ceil(r.necessidade.kgFaltando)))
+    }
+  }, [user, api])
+
+  useEffect(() => { load() }, [load])
+
+  const precoRacao = mercado?.precos?.precoRacao || 2
+  const kgNum = parseFloat(kgSolicitado) || 0
+  const valorTotal = Math.round(kgNum * precoRacao * 100) / 100
+
+  async function enviarPedido() {
+    if (!comprovante) return notify('Cole o link do comprovante!', 'danger')
+    const r = await api('/api/celeiro', {
+      method: 'POST',
+      body: JSON.stringify({ kg_solicitado: kgNum, comprovante, valor_total: valorTotal })
+    })
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.coin()
+    setStep(3)
+    load()
+  }
+
+  if (!user) return (
+    <div style={{ textAlign: 'center', padding: 60 }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>🏚</div>
+      <div style={{ fontSize: 16, color: T.textMuted }}>Faça login para acessar o Celeiro.</div>
+    </div>
+  )
+
+  return (
+    <div>
+      <div style={{ marginBottom: 28, paddingBottom: 16, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+          <span style={{ fontSize: 24 }}>🏚</span>
+          <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, fontWeight: 700, color: T.text }}>Celeiro</h1>
+        </div>
+        <p style={{ fontSize: 13, color: T.textMuted, marginLeft: 36 }}>
+          Compre ração para as fases Garrote e Boi — obrigatório para avançar o rebanho
+        </p>
+      </div>
+
+      {/* Indicador de necessidade */}
+      {dados?.necessidade && (
+        <div style={{ background: dados.necessidade.kgFaltando > 0 ? 'rgba(42,16,0,.8)' : 'rgba(10,42,10,.6)', border: `1px solid ${dados.necessidade.kgFaltando > 0 ? '#8a4010' : T.greenDark || '#2a5a12'}`, borderRadius: 14, padding: 18, marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.text, fontFamily: "'Playfair Display',serif" }}>
+              {dados.necessidade.kgFaltando > 0 ? '⚠ Ração insuficiente para completar o ciclo' : '✓ Estoque suficiente'}
+            </div>
+            <span style={{ background: dados.necessidade.kgFaltando > 0 ? 'rgba(200,80,20,.2)' : 'rgba(20,80,20,.2)', border: `1px solid ${dados.necessidade.kgFaltando > 0 ? '#8a4010' : '#2a5a12'}`, color: dados.necessidade.kgFaltando > 0 ? '#e09030' : '#4ad4a0', fontSize: 11, padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>
+              {dados.necessidade.kgDisponivel}kg em estoque
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+            {[
+              { label: 'Necessário ciclo', value: `${dados.necessidade.kgNecessario}kg`, color: T.text },
+              { label: 'Em estoque', value: `${dados.necessidade.kgDisponivel}kg`, color: '#4ad4a0' },
+              { label: 'Falta comprar', value: `${dados.necessidade.kgFaltando}kg`, color: dados.necessidade.kgFaltando > 0 ? '#e09030' : '#4ad4a0' },
+            ].map(m => (
+              <div key={m.label} style={{ background: T.inputBg, borderRadius: 10, padding: '12px 14px', border: `1px solid ${T.border}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: T.textMuted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.6px' }}>{m.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: m.color, fontFamily: "'Playfair Display',serif" }}>{m.value}</div>
+              </div>
+            ))}
+          </div>
+          {dados.necessidade.detalhes?.length > 0 && (
+            <div style={{ marginTop: 12, fontSize: 12, color: T.textMuted, lineHeight: 1.8 }}>
+              {dados.necessidade.detalhes.map((d, i) => (
+                <span key={i} style={{ marginRight: 16 }}>
+                  {d.fase === 'garrote' ? '🐄 Garrote' : '🐄 Boi'}: {d.kg}kg
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
+
+        {/* Solicitar ração */}
+        {step === 3 ? (
+          <div style={{ background: T.card, border: `1px solid ${T.border2}`, borderRadius: 14, padding: 40, textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🌾</div>
+            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, color: '#4ad4a0', fontWeight: 700, marginBottom: 8 }}>Pedido enviado!</div>
+            <div style={{ fontSize: 13, color: T.textMuted, marginBottom: 20, lineHeight: 1.7 }}>O admin irá confirmar e a ração será creditada no seu estoque.</div>
+            <button onClick={() => { setStep(1); setComprovante('') }} style={{ padding: '9px 20px', background: `linear-gradient(135deg,${T.goldDark||'#8a5e10'},${T.gold||'#c8922a'})`, color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Novo pedido
+            </button>
+          </div>
+        ) : (
+          <div style={{ background: T.card, border: `1px solid ${T.border2}`, borderRadius: 14, padding: 20 }}>
+            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 16 }}>
+              {step === 1 ? '1. Quantidade' : '2. Comprovante'}
+            </div>
+
+            {step === 1 && (
+              <>
+                <div style={{ background: T.inputBg, borderRadius: 10, padding: 14, marginBottom: 16, border: `1px solid ${T.border}`, fontSize: 12, color: T.textMuted, lineHeight: 1.7 }}>
+                  💡 A ração da compra de bezerros cobre só a fase 1. Compre aqui para as fases Garrote (35kg/cab) e Boi (56kg/cab).
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 11, color: T.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.6px', display: 'block', marginBottom: 6 }}>Quantidade (kg)</label>
+                  <input
+                    type="number"
+                    value={kgSolicitado}
+                    onChange={e => setKgSolicitado(e.target.value)}
+                    style={{ width: '100%', background: T.inputBg, border: `1px solid ${T.border2}`, borderRadius: 10, padding: '10px 14px', fontSize: 20, color: T.text, fontFamily: "'Playfair Display',serif", fontWeight: 700, outline: 'none', textAlign: 'center' }}
+                  />
+                </div>
+                {kgNum > 0 && (
+                  <div style={{ background: T.inputBg, borderRadius: 10, padding: 14, marginBottom: 16, border: `1px solid ${T.border}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8, color: T.textDim }}>
+                      <span>{kgNum}kg × ${precoRacao}/kg</span>
+                      <span style={{ fontWeight: 600 }}>${fmt(valorTotal)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>
+                      <span style={{ color: T.text }}>Total</span>
+                      <span style={{ color: T.gold || '#c8922a' }}>${fmt(valorTotal)}</span>
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={() => setStep(2)}
+                  disabled={!kgNum || kgNum <= 0}
+                  style={{ width: '100%', padding: 12, background: kgNum > 0 ? `linear-gradient(135deg,${T.goldDark||'#8a5e10'},${T.gold||'#c8922a'})` : T.border, color: kgNum > 0 ? '#fff' : T.textMuted, border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: kgNum > 0 ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+                >
+                  Pagar ${fmt(valorTotal)} no servidor →
+                </button>
+              </>
+            )}
+
+            {step === 2 && (
+              <>
+                <div style={{ background: T.inputBg, borderRadius: 10, padding: 14, marginBottom: 16, border: `1px solid ${T.border}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontFamily: "'Playfair Display',serif", fontWeight: 700 }}>
+                    <span style={{ color: T.text }}>Total pago</span>
+                    <span style={{ color: T.gold || '#c8922a' }}>${fmt(valorTotal)}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: T.textMuted, marginTop: 4 }}>{kgNum}kg · ${precoRacao}/kg</div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 11, color: T.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.6px', display: 'block', marginBottom: 6 }}>Link do comprovante (Discord)</label>
+                  <input
+                    value={comprovante}
+                    onChange={e => setComprovante(e.target.value)}
+                    placeholder="https://discord.com/channels/..."
+                    style={{ width: '100%', background: T.inputBg, border: `1px solid ${T.border2}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.text, fontFamily: 'inherit', outline: 'none' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => setStep(1)} style={{ flex: 1, padding: 10, background: 'transparent', border: `1px solid ${T.border2}`, color: T.textDim, borderRadius: 10, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Voltar</button>
+                  <button onClick={enviarPedido} style={{ flex: 2, padding: 10, background: `linear-gradient(135deg,${T.goldDark||'#8a5e10'},${T.gold||'#c8922a'})`, color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Enviar pedido</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Meus pedidos */}
+        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 14 }}>Meus pedidos</div>
+          {!dados?.pedidos?.length ? (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: T.textMuted, fontSize: 13 }}>Nenhum pedido ainda</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {dados.pedidos.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: T.inputBg, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{p.kg_solicitado}kg</div>
+                    <div style={{ fontSize: 11, color: T.textMuted }}>${fmt(p.valor_total)} · ${p.preco_kg}/kg</div>
+                  </div>
+                  <div style={{ fontSize: 10, color: T.textMuted }}>{new Date(p.criado_em).toLocaleDateString('pt-BR')}</div>
+                  <span style={{
+                    background: p.status === 'entregue' ? 'rgba(10,42,10,.8)' : p.status === 'recusado' ? 'rgba(42,10,10,.8)' : 'rgba(42,24,0,.8)',
+                    border: `1px solid ${p.status === 'entregue' ? '#2a5a12' : p.status === 'recusado' ? '#6a1818' : '#6a4010'}`,
+                    color: p.status === 'entregue' ? '#4ad4a0' : p.status === 'recusado' ? '#e06060' : '#e09030',
+                    fontSize: 10, padding: '3px 8px', borderRadius: 10, fontWeight: 600, whiteSpace: 'nowrap'
+                  }}>
+                    {p.status === 'entregue' ? '✓ Entregue' : p.status === 'recusado' ? '✗ Recusado' : '⏳ Pendente'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Admin — pedidos pendentes */}
+      {user?.role === 'admin' && dados?.pedidos?.filter(p => p.status === 'pendente').length > 0 && (
+        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: 20, marginTop: 16 }}>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 14 }}>
+            Pedidos pendentes — Admin
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {dados.pedidos.filter(p => p.status === 'pendente').map(p => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: T.inputBg, borderRadius: 10, border: `1px solid ${T.border2}`, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{p.jogador_nome}</div>
+                  <div style={{ fontSize: 12, color: T.textMuted }}>{p.kg_solicitado}kg · ${fmt(p.valor_total)} · ${p.preco_kg}/kg</div>
+                  {p.comprovante && <a href={p.comprovante} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#4a90d0' }}>Ver comprovante →</a>}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={async () => {
+                    await api('/api/celeiro', { method: 'PATCH', body: JSON.stringify({ id: p.id, status: 'entregue' }) })
+                    notify('✓ Ração entregue!')
+                    load()
+                  }} style={{ padding: '6px 14px', background: `linear-gradient(135deg,${T.greenDark||'#2a5a12'},${T.green||'#4a8a20'})`, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    ✓ Confirmar entrega
+                  </button>
+                  <button onClick={async () => {
+                    await api('/api/celeiro', { method: 'PATCH', body: JSON.stringify({ id: p.id, status: 'recusado' }) })
+                    notify('Pedido recusado.')
+                    load()
+                  }} style={{ padding: '6px 10px', background: '#3a0808', color: '#e06060', border: '1px solid #6a1818', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    ✗
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
