@@ -1162,7 +1162,7 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
       {/* Admin Panel */}
       {tab === 'admin' && user?.role === 'admin' && <AdminTransportadoraPanel T={T} api={api} notify={notify} sounds={sounds} onReload={load}/>}
 
-      {/* Modal aceitar frete */}}
+      {/* Modal aceitar frete */}
       {aceitando && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
           <div style={{ background:T.card, border:'1px solid #3020a0', borderRadius:20, padding:32, width:'100%', maxWidth:400, boxShadow:'0 30px 80px rgba(0,0,0,.5)' }}>
