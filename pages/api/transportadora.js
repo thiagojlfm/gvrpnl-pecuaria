@@ -19,8 +19,19 @@ export default async function handler(req, res) {
 
     if (tipo === 'disponiveis') {
       if (!user) return res.status(401).json({ error: 'Não autorizado' })
+      // Check user's caminhoes to filter fretes by tipo
+      const { data: meusCam } = await query(
+        `SELECT tipo, racao_cap, capacidade FROM caminhoes WHERE jogador_id=$1 AND status='disponivel'`, [user.id]
+      )
+      const temVan = (meusCam||[]).some(c => c.tipo === 'racao')
+      const temTruck = (meusCam||[]).some(c => (c.tipo||'gado') === 'gado')
+      // Show ração fretes if has van/truck with racao_cap, show gado fretes if has truck
+      let whereClause = `status = 'disponivel'`
+      if (temVan && !temTruck) whereClause += ` AND tipo_carga = 'racao'`
+      else if (!temVan && temTruck) whereClause += ` AND (tipo_carga = 'gado' OR tipo_carga IS NULL)`
+      // else show all if has both
       const { data } = await query(
-        `SELECT * FROM fretes_transportadora WHERE status = 'disponivel' ORDER BY criado_em DESC`, []
+        `SELECT * FROM fretes_transportadora WHERE ${whereClause} ORDER BY criado_em DESC`, []
       )
       return res.json(data || [])
     }
@@ -86,18 +97,30 @@ export default async function handler(req, res) {
     )
     if (!caminhao) return res.status(400).json({ error: 'Caminhão não disponível' })
 
-    // Verificar capacidade — caminhão deve ter capacidade >= quantidade do frete
-    if (caminhao.capacidade < frete.quantidade) {
-      return res.status(400).json({
-        error: `Caminhão com capacidade insuficiente! Este frete tem ${frete.quantidade} cabeças mas seu caminhão comporta apenas ${caminhao.capacidade}. Você precisaria de ${Math.ceil(frete.quantidade / caminhao.capacidade)} caminhão(ões) deste modelo.`
-      })
+    // Verificar compatibilidade tipo carga
+    const tipoFrete = frete.tipo_carga || 'gado'
+    const tipoCaminhao = caminhao.tipo || 'gado'
+    if (tipoFrete === 'racao' && tipoCaminhao === 'gado' && caminhao.racao_cap <= 0) {
+      return res.status(400).json({ error: 'Este caminhão não transporta ração!' })
+    }
+    if (tipoFrete === 'gado' && tipoCaminhao === 'racao') {
+      return res.status(400).json({ error: 'Van de ração não transporta gado!' })
     }
 
-    // Verificar capacidade
-    if (frete.quantidade > caminhao.capacidade) {
-      return res.status(400).json({
-        error: `Caminhão não comporta ${frete.quantidade} cabeças! Capacidade máxima: ${caminhao.capacidade}. Este frete precisa de um caminhão maior.`
-      })
+    // Verificar capacidade conforme tipo
+    if (tipoFrete === 'racao') {
+      const racaoCap = caminhao.racao_cap || 0
+      if (frete.quantidade > racaoCap) {
+        return res.status(400).json({
+          error: `Capacidade de ração insuficiente! Frete tem ${frete.quantidade}kg mas seu veículo comporta ${racaoCap}kg.`
+        })
+      }
+    } else {
+      if (caminhao.capacidade < frete.quantidade) {
+        return res.status(400).json({
+          error: `Caminhão insuficiente! ${frete.quantidade} cab. mas seu caminhão comporta ${caminhao.capacidade}.`
+        })
+      }
     }
 
     const agora = new Date()
@@ -171,6 +194,27 @@ export default async function handler(req, res) {
       const { data: frete } = await queryOne(
         `UPDATE fretes_transportadora SET status=$1 WHERE id=$2 RETURNING *`, [status, id]
       )
+      // Fluxo ração manual: liberado → retirado → entregue
+      // 'liberado' — admin libera carga no armazém
+      if (status === 'liberado') {
+        await query(
+          `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+          [frete.transportador_id || frete.comprador_id,
+           '🌾 Carga liberada no armazém!',
+           `Frete ${frete.lote_codigo} — ${frete.quantidade}kg prontos para retirada. Vá ao armazém no jogo e clique em "Retirei".`]
+        )
+      }
+
+      // 'retirado' — transportador confirma retirada no armazém
+      if (status === 'retirado') {
+        await query(
+          `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+          [frete.comprador_id,
+           '🚐 Ração a caminho!',
+           `${frete.transportador_nome} retirou ${frete.quantidade}kg no armazém. Vá ao encontro dele no jogo e clique em "Recebi" quando chegar.`]
+        )
+      }
+
       // Se entregue, liberar caminhão
       if (status === 'entregue' && frete?.caminhao_id) {
         await query(`UPDATE caminhoes SET status='disponivel' WHERE id=$1`, [frete.caminhao_id])

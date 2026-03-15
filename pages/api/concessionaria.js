@@ -3,6 +3,7 @@ import { verifyToken, getTokenFromReq } from '../../lib/auth'
 
 // Seed de modelos padrão
 const MODELOS_PADRAO = [
+  { modelo:'Van de Ração', descricao:'Exclusiva para transporte de ração. Não transporta gado.', capacidade:0, racao_cap:500, preco:50000, foto_url:'/van.jpg', tipo:'racao' },
   { modelo:'Truck Pequeno', descricao:'Ideal para pequenos criadores.', capacidade:30, racao_cap:1500, preco:80000, foto_url:'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=400&q=80' },
   { modelo:'Truck Médio', descricao:'O mais popular do servidor.', capacidade:60, racao_cap:3000, preco:150000, foto_url:'/truck_medio.jpg' },
   { modelo:'Carretão', descricao:'Para grandes fazendas. Máxima capacidade por viagem.', capacidade:120, racao_cap:6000, preco:210000, foto_url:'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=400&q=80' },
@@ -16,14 +17,14 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { tipo } = req.query
 
-    // Seed only if empty or prices are wrong
-    const { data: check } = await query(`SELECT id FROM concessionaria_estoque WHERE preco = 150000 LIMIT 1`, [])
+    // Seed only if van doesn't exist yet
+    const { data: check } = await query(`SELECT id FROM concessionaria_estoque WHERE modelo = 'Van de Ração' LIMIT 1`, [])
     if (!check?.length) {
       await query(`DELETE FROM concessionaria_estoque`, [])
       for (const m of MODELOS_PADRAO) {
         await query(
-          `INSERT INTO concessionaria_estoque (modelo, descricao, capacidade, racao_cap, preco, foto_url) VALUES ($1,$2,$3,$4,$5,$6)`,
-          [m.modelo, m.descricao, m.capacidade, m.racao_cap, m.preco, m.foto_url]
+          `INSERT INTO concessionaria_estoque (modelo, descricao, capacidade, racao_cap, preco, foto_url, tipo) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [m.modelo, m.descricao, m.capacidade, m.racao_cap||0, m.preco, m.foto_url, m.tipo||'gado']
         )
       }
     }
@@ -81,9 +82,9 @@ export default async function handler(req, res) {
       const { data: modelo } = await queryOne(`SELECT * FROM concessionaria_estoque WHERE id=$1`, [pedido.modelo_id])
       const placa = `GV-${String(Math.floor(Math.random()*9000)+1000)}`
       await queryOne(
-        `INSERT INTO caminhoes (jogador_id, jogador_nome, modelo, placa, capacidade, racao_cap, status)
-         VALUES ($1,$2,$3,$4,$5,$6,'disponivel') RETURNING *`,
-        [pedido.jogador_id, pedido.jogador_nome, pedido.modelo_nome, placa, modelo?.capacidade || 60, modelo?.racao_cap || 3000]
+        `INSERT INTO caminhoes (jogador_id, jogador_nome, modelo, placa, capacidade, racao_cap, tipo, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel') RETURNING *`,
+        [pedido.jogador_id, pedido.jogador_nome, pedido.modelo_nome, placa, modelo?.capacidade || 60, modelo?.racao_cap || 3000, modelo?.tipo || 'gado']
       )
       await query(
         `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,

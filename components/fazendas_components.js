@@ -816,6 +816,9 @@ export function CeleiroPage({ T, user, api, notify, mercado, sounds }) {
         </div>
       </div>
 
+      {/* Fretes de ração em andamento — produtor vê aqui */}
+      <FreteRacaoSection T={T} user={user} api={api} notify={notify} sounds={sounds}/>
+
       {/* Admin — pedidos pendentes */}
       {user?.role === 'admin' && dados?.pedidos?.filter(p => p.status === 'pendente').length > 0 && (
         <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: 20, marginTop: 16 }}>
@@ -1036,6 +1039,11 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
           ))}
         </div>
       )}
+
+      {/* Fretes de ração aguardando ação do transportador */}
+      {meusFretes.filter(f=>f.tipo_carga==='racao'&&['liberado','retirado'].includes(f.status)).map(f=>(
+        <FreteRacaoCard key={f.id} frete={f} T={T} user={user} api={api} notify={notify} sounds={sounds} onReload={load}/>
+      ))}
 
       {/* Fretes em andamento */}
       {emRota.length > 0 && (
@@ -1364,8 +1372,9 @@ export function ConcessionariaPage({ T, user, api, notify, sounds }) {
                 <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:T.text, marginBottom:4 }}>{m.modelo}</div>
                 <div style={{ fontSize:12, color:T.textMuted, marginBottom:8, lineHeight:1.6 }}>{m.descricao}</div>
                 <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
-                  <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🐄 {m.capacidade} cab.</span>
-                  <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border2}`, color:T.gold||'#c8922a', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌾 {fmt(m.racao_cap||0)}kg ração</span>
+                  {m.capacidade > 0 && <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🐄 {m.capacidade} cab.</span>}
+                  {(m.racao_cap||0) > 0 && <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border2}`, color:T.gold||'#c8922a', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌾 {fmt(m.racao_cap)}kg ração</span>}
+                  {m.tipo==='racao' && <span style={{ background:'rgba(100,160,80,.1)', border:'1px solid #4a8a30', color:'#6ab840', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>Somente ração</span>}
                 </div>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                   <div style={{ fontSize:22, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(m.preco)}</div>
@@ -1683,7 +1692,12 @@ function CaminhaoCard({ caminhao: c, T, api, notify, onReload }) {
           {c.nome_transportadora && <div style={{ fontSize:11, color:T.textMuted, marginBottom:4 }}>{c.modelo}</div>}
         </div>
       )}
-      <div style={{ fontSize:12, color:T.textMuted, marginBottom:10 }}>Placa {c.placa} · {c.capacidade} cab. máx</div>
+      <div style={{ fontSize:12, color:T.textMuted, marginBottom:6 }}>Placa {c.placa}</div>
+      <div style={{ display:'flex', gap:6, marginBottom:10, flexWrap:'wrap' }}>
+        {(c.tipo||'gado') !== 'racao' && <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:10, padding:'2px 8px', borderRadius:6, fontWeight:600 }}>🐄 {c.capacidade} cab.</span>}
+        {(c.racao_cap||0) > 0 && <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border}`, color:T.gold||'#c8922a', fontSize:10, padding:'2px 8px', borderRadius:6, fontWeight:600 }}>🌾 {fmt(c.racao_cap)}kg</span>}
+        {(c.tipo||'gado') === 'racao' && <span style={{ background:'rgba(100,160,80,.1)', border:'1px solid #4a8a30', color:'#6ab840', fontSize:10, padding:'2px 8px', borderRadius:6, fontWeight:600 }}>Somente ração</span>}
+      </div>
       <span style={{ background:c.status==='disponivel'?'rgba(10,42,10,.8)':'rgba(10,8,24,.8)', border:`1px solid ${c.status==='disponivel'?'#2a5a12':'#3020a0'}`, color:c.status==='disponivel'?'#4ad4a0':'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
         {c.status==='disponivel'?'✓ Disponível':'🚛 Em rota'}
       </span>
@@ -1798,7 +1812,7 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
                       <span>🚛</span>
                       <div style={{ flex:1, textAlign:'left' }}>
                         <div style={{ fontSize:12, fontWeight:600, color:insuf?'#e06060':T.text }}>{c.modelo} — {c.capacidade} cab.</div>
-                        <div style={{ fontSize:10, color:T.textMuted }}>Suporta até {maxBlocos} bloco(s){insuf?' — insuficiente':''}</div>
+                        <div style={{ fontSize:10, color:T.textMuted }}>{isRacao ? `🌾 ${fmt(c.racao_cap||0)}kg ração` : `🐄 ${c.capacidade} cab.`} · até {maxBlocos} bloco(s){insuf?' — insuficiente':''}</div>
                       </div>
                       {camSel===c.id.toString()&&<span style={{color:'#a080ff'}}>✓</span>}
                     </button>
@@ -1816,6 +1830,186 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
           </> : <div style={{ fontSize:13, color:'#e06060', textAlign:'center', padding:'8px 0' }}>Sem caminhão livre — compre um na Concessionária</div>}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Frete Ração Card ─────────────────────────────────────────────────────────
+export function FreteRacaoCard({ frete, T, user, api, notify, sounds, onReload }) {
+  const [loading, setLoading] = useState(false)
+
+  const STATUS = {
+    aguardando_liberacao: { label:'⏳ Aguardando liberação', color:'#e09030', bg:'rgba(42,24,0,.6)', border:'#8a4010' },
+    liberado:             { label:'✅ Liberado no armazém', color:'#a080ff', bg:'rgba(10,8,24,.6)', border:'#3020a0' },
+    retirado:             { label:'🚐 A caminho do produtor', color:'#4a90d0', bg:'rgba(10,20,40,.6)', border:'#1a4080' },
+    entregue:             { label:'✓ Entregue', color:'#4ad4a0', bg:'rgba(10,42,10,.6)', border:'#2a5a12' },
+  }
+
+  const s = STATUS[frete.status] || STATUS.aguardando_liberacao
+  const isAdmin = user?.role === 'admin'
+  const isTransportador = String(frete.transportador_id) === String(user?.id)
+  const isProdutor = String(frete.comprador_id) === String(user?.id)
+
+  async function avancar(novoStatus) {
+    setLoading(true)
+    const r = await api('/api/transportadora', {
+      method: 'PATCH',
+      body: JSON.stringify({ id: frete.id, status: novoStatus })
+    })
+    setLoading(false)
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.success()
+    onReload && onReload()
+  }
+
+  return (
+    <div style={{ background:T.card, border:`1px solid ${s.border}`, borderRadius:14, padding:18 }}>
+      <div style={{ display:'flex', alignItems:'flex-start', gap:14, marginBottom:12 }}>
+        <div style={{ fontSize:28, flexShrink:0 }}>🌾</div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>
+            {frete.lote_codigo} — {frete.quantidade}kg de ração
+          </div>
+          <div style={{ fontSize:12, color:T.textMuted, marginTop:2 }}>
+            {frete.origem} → {frete.destino}
+          </div>
+          {frete.transportador_nome && (
+            <div style={{ fontSize:11, color:'#a080ff', marginTop:2 }}>🚐 {frete.transportador_nome}</div>
+          )}
+          {frete.bloco_total > 1 && (
+            <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>
+              Bloco {frete.bloco_num}/{frete.bloco_total}
+            </div>
+          )}
+        </div>
+        <div style={{ textAlign:'right' }}>
+          <div style={{ fontSize:18, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>
+            ${fmt(frete.valor)}
+          </div>
+          <span style={{ background:s.bg, border:`1px solid ${s.border}`, color:s.color, fontSize:10, padding:'2px 8px', borderRadius:8, fontWeight:600, display:'inline-block', marginTop:4 }}>
+            {s.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Steps visual */}
+      <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:14 }}>
+        {[
+          { k:'aguardando_liberacao', label:'Admin libera' },
+          { k:'liberado', label:'Transportador retira' },
+          { k:'retirado', label:'Produtor confirma' },
+          { k:'entregue', label:'Entregue' },
+        ].map((step, i) => {
+          const steps = ['aguardando_liberacao','liberado','retirado','entregue']
+          const idx = steps.indexOf(frete.status)
+          const done = steps.indexOf(step.k) <= idx
+          return (
+            <div key={step.k} style={{ display:'flex', alignItems:'center', flex: i < 3 ? 1 : 'auto' }}>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                <div style={{ width:20, height:20, borderRadius:'50%', background:done?'rgba(80,48,192,.5)':'rgba(255,255,255,.05)', border:`2px solid ${done?'#8060d0':'#2a1a50'}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:done?'#c0a0ff':'#4a3060', fontWeight:700 }}>
+                  {done ? '✓' : i+1}
+                </div>
+                <div style={{ fontSize:9, color:done?'#a080ff':T.textMuted, whiteSpace:'nowrap', textAlign:'center' }}>{step.label}</div>
+              </div>
+              {i < 3 && <div style={{ flex:1, height:2, background:done?'#5030a0':'rgba(255,255,255,.05)', margin:'0 4px', marginBottom:16 }}/>}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display:'flex', gap:8 }}>
+        {/* Admin libera */}
+        {isAdmin && frete.status === 'aguardando_liberacao' && (
+          <button onClick={() => avancar('liberado')} disabled={loading} style={{ flex:1, padding:'9px 0', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            {loading ? '...' : '✅ Liberar no armazém'}
+          </button>
+        )}
+
+        {/* Transportador retira */}
+        {isTransportador && frete.status === 'liberado' && (
+          <button onClick={() => avancar('retirado')} disabled={loading} style={{ flex:1, padding:'9px 0', background:'linear-gradient(135deg,#1a3a8a,#2a60d0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            {loading ? '...' : '🚐 Retirei no armazém'}
+          </button>
+        )}
+
+        {/* Produtor confirma */}
+        {isProdutor && frete.status === 'retirado' && (
+          <button onClick={() => avancar('entregue')} disabled={loading} style={{ flex:1, padding:'9px 0', background:'linear-gradient(135deg,#1a4a10,#2a7a18)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            {loading ? '...' : '✓ Recebi a ração!'}
+          </button>
+        )}
+
+        {frete.status === 'entregue' && !frete.pago && isAdmin && (
+          <button onClick={() => avancar('pago')} disabled={loading} style={{ flex:1, padding:'9px 0', background:'linear-gradient(135deg,#3a2000,#8a5010)', color:'#e09030', border:'1px solid #8a5010', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            {loading ? '...' : '💰 Addmoney feito'}
+          </button>
+        )}
+      </div>
+
+      {/* Mensagens de instrução */}
+      {frete.status === 'aguardando_liberacao' && isAdmin && (
+        <div style={{ fontSize:11, color:T.textMuted, marginTop:8, fontStyle:'italic' }}>Após o transportador estar no armazém no jogo, libere a carga.</div>
+      )}
+      {frete.status === 'liberado' && isTransportador && (
+        <div style={{ fontSize:11, color:'#a080ff', marginTop:8 }}>Vá ao armazém no jogo e retire a carga. Depois clique em "Retirei".</div>
+      )}
+      {frete.status === 'retirado' && isProdutor && (
+        <div style={{ fontSize:11, color:'#4a90d0', marginTop:8 }}>Aguarde o transportador chegar até você no jogo. Só confirme quando receber fisicamente.</div>
+      )}
+    </div>
+  )
+}
+
+// ─── Frete Ração Section ─────────────────────────────────────────────────────
+function FreteRacaoSection({ T, user, api, notify, sounds }) {
+  const [fretes, setFretes] = useState([])
+
+  const load = useCallback(async () => {
+    if (!user) return
+    // Admin sees all ração fretes, others see their own
+    const tipo = user.role === 'admin' ? 'todos' : 'meus'
+    const r = await api(`/api/transportadora?tipo=${tipo}`)
+    const todos = Array.isArray(r) ? r : []
+    // Filter only ração fretes not yet delivered/paid
+    const racaoAtivos = todos.filter(f =>
+      f.tipo_carga === 'racao' &&
+      !['entregue_pago','pago'].includes(f.status)
+    )
+    setFretes(racaoAtivos)
+  }, [user, api])
+
+  useEffect(() => { load() }, [load])
+
+  // Also show fretes where user is the comprador (produtor)
+  const [fretesProdutor, setFretesProdutor] = useState([])
+  useEffect(() => {
+    if (!user || user.role === 'admin') return
+    fetch('/api/transportadora?tipo=todos', {
+      headers: { Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('gvrpnl_token') : ''}` }
+    }).then(r => r.json()).then(d => {
+      if (!Array.isArray(d)) return
+      const meus = d.filter(f => f.tipo_carga === 'racao' && String(f.comprador_id) === String(user.id) && f.status !== 'pago')
+      setFretesProdutor(meus)
+    }).catch(() => {})
+  }, [user])
+
+  const todosFretes = user?.role === 'admin'
+    ? fretes
+    : [...fretes.filter(f => String(f.transportador_id) === String(user?.id)), ...fretesProdutor.filter(f => !fretes.find(x => x.id === f.id))]
+
+  if (todosFretes.length === 0) return null
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700, color:T.text, marginBottom:14 }}>
+        🌾 Fretes de ração em andamento
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {todosFretes.map(f => (
+          <FreteRacaoCard key={f.id} frete={f} T={T} user={user} api={api} notify={notify} sounds={sounds} onReload={load}/>
+        ))}
+      </div>
     </div>
   )
 }
