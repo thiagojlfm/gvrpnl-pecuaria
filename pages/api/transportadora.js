@@ -104,15 +104,32 @@ export default async function handler(req, res) {
     const chegaBuscar = new Date(agora.getTime() + 30 * 60 * 1000) // 30min indo buscar
     const chegaFazenda = new Date(agora.getTime() + 60 * 60 * 1000) // 60min total (chegou na fazenda)
 
-    // Aceitar frete atomicamente
-    const { data: freteAtualizado, error } = await queryOne(
-      `UPDATE fretes_transportadora
-       SET status='em_rota_buscar', transportador_id=$1, transportador_nome=$2,
-           caminhao_id=$3, aceito_em=now(), entrega_em=$4, chegada_fazenda_em=$5
-       WHERE id=$6 AND status='disponivel' RETURNING *`,
-      [user.id, user.username, caminhao_id, chegaBuscar.toISOString(), chegaFazenda.toISOString(), frete_id]
-    )
-    if (error || !freteAtualizado) return res.status(400).json({ error: 'Frete já foi aceito por outro!' })
+    // Aceitar blocos — transportador pode pegar múltiplos blocos do mesmo lote
+    const blocos_ids = req.body.blocos_ids || [frete_id] // array de IDs de blocos
+    const totalQtd = blocos_ids.length === 1 ? frete.quantidade :
+      (await query(`SELECT SUM(quantidade) as t FROM fretes_transportadora WHERE id = ANY($1::int[])`, [blocos_ids])).data?.[0]?.t || frete.quantidade
+
+    // Base 1h + 15min por bloco extra
+    const numBlocos = blocos_ids.length
+    const duracaoMs = (60 + (numBlocos - 1) * 15) * 60 * 1000  // 1h base + 15min por bloco extra
+    const buscaMs = Math.floor(duracaoMs / 2)  // metade do tempo indo buscar
+    const chegaBuscarMulti = new Date(agora.getTime() + buscaMs)
+    const chegaFazendaMulti = new Date(agora.getTime() + duracaoMs)
+
+    // Aceitar todos os blocos atomicamente
+    let aceitou = 0
+    for (const bid of blocos_ids) {
+      const { data: b } = await queryOne(
+        `UPDATE fretes_transportadora
+         SET status='em_rota_buscar', transportador_id=$1, transportador_nome=$2,
+             caminhao_id=$3, aceito_em=now(), entrega_em=$4, chegada_fazenda_em=$5
+         WHERE id=$6 AND status='disponivel' RETURNING *`,
+        [user.id, user.username, caminhao_id, chegaBuscarMulti.toISOString(), chegaFazendaMulti.toISOString(), bid]
+      )
+      if (b) aceitou++
+    }
+    if (aceitou === 0) return res.status(400).json({ error: 'Fretes já foram aceitos por outro!' })
+    const freteAtualizado = await queryOne(`SELECT * FROM fretes_transportadora WHERE id=$1`, [frete_id]).then(r=>r.data)
 
     // Marcar caminhão como ocupado
     await query(`UPDATE caminhoes SET status='em_rota' WHERE id=$1`, [caminhao_id])

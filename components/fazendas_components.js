@@ -981,7 +981,11 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
     if (!caminhaoSel) return notify('Selecione um caminhão!', 'danger')
     const r = await api('/api/transportadora', {
       method: 'POST',
-      body: JSON.stringify({ frete_id: aceitando.id, caminhao_id: parseInt(caminhaoSel) })
+      body: JSON.stringify({
+        frete_id: aceitando.id,
+        caminhao_id: parseInt(caminhaoSel),
+        blocos_ids: aceitando.blocos_ids || [aceitando.id]
+      })
     })
     if (r.error) return notify('Erro: ' + r.error, 'danger')
     sounds?.success()
@@ -1081,27 +1085,7 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              {fretes.map(f => (
-                <div key={f.id} style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:18, display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
-                  <div style={{ fontSize:32 }}>🐄</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:15, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>{f.quantidade} cabeças</div>
-                    <div style={{ fontSize:12, color:T.textMuted, marginTop:2 }}>{f.origem} → {f.destino}</div>
-                    <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>⏱ 1 hora de rota</div>
-                  </div>
-                  <div style={{ textAlign:'right' }}>
-                    <div style={{ fontSize:22, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
-                    <div style={{ fontSize:11, color:T.textMuted }}>$30/cab (você recebe)</div>
-                  </div>
-                  <button
-                    onClick={() => { setAceitando(f); setCaminhaoSel(caminhoesLivres[0]?.id?.toString() || '') }}
-                    disabled={caminhoesLivres.length === 0}
-                    style={{ padding:'10px 20px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:caminhoesLivres.length>0?'pointer':'not-allowed', fontFamily:'inherit', opacity:caminhoesLivres.length>0?1:.5 }}
-                  >
-                    {caminhoesLivres.length > 0 ? 'Aceitar frete' : 'Sem caminhão livre'}
-                  </button>
-                </div>
-              ))}
+              <FretesBlocos fretes={fretes} T={T} caminhoesLivres={caminhoesLivres} onAceitar={(blocos,cam)=>{setAceitando({...blocos[0],blocos_ids:blocos.map(b=>b.id),totalQtd:blocos.reduce((s,b)=>s+b.quantidade,0),totalValor:blocos.reduce((s,b)=>s+Number(b.valor),0),numBlocos:blocos.length});setCaminhaoSel(cam?.id?.toString()||'')}}/>
             </div>
           )}
         </>
@@ -1166,7 +1150,7 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
             <div style={{ background:T.inputBg, borderRadius:12, padding:16, marginBottom:16, border:`1px solid ${T.border}` }}>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:8 }}>
                 <span style={{ color:T.textMuted }}>Carga</span>
-                <span style={{ fontWeight:700, color:T.text }}>{aceitando.quantidade} bezerros</span>
+                <span style={{ fontWeight:700, color:T.text }}>{aceitando.totalQtd||aceitando.quantidade} bezerros {aceitando.numBlocos>1&&<span style={{fontSize:11,color:'#a080ff'}}>({aceitando.numBlocos} blocos)</span>}</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:8 }}>
                 <span style={{ color:T.textMuted }}>Rota</span>
@@ -1174,11 +1158,11 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:8 }}>
                 <span style={{ color:T.textMuted }}>Duração</span>
-                <span style={{ color:T.textDim }}>1 hora (30min + 30min)</span>
+                <span style={{ color:T.textDim }}>{aceitando.numBlocos > 1 ? `1h${(aceitando.numBlocos-1)*15}min` : '1h'} total</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:18, fontWeight:800, fontFamily:"'Playfair Display',serif", paddingTop:8, borderTop:`1px solid ${T.border}` }}>
                 <span style={{ color:T.text }}>Ganho</span>
-                <span style={{ color:'#a080ff' }}>${fmt(aceitando.valor)}</span>
+                <span style={{ color:'#a080ff' }}>${fmt(aceitando.totalValor||aceitando.valor)}</span>
               </div>
             </div>
             {caminhoesLivres.length > 0 && (
@@ -1694,6 +1678,135 @@ function CaminhaoCard({ caminhao: c, T, api, notify, onReload }) {
       <span style={{ background:c.status==='disponivel'?'rgba(10,42,10,.8)':'rgba(10,8,24,.8)', border:`1px solid ${c.status==='disponivel'?'#2a5a12':'#3020a0'}`, color:c.status==='disponivel'?'#4ad4a0':'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
         {c.status==='disponivel'?'✓ Disponível':'🚛 Em rota'}
       </span>
+    </div>
+  )
+}
+
+// ─── Fretes por blocos — UI de seleção ───────────────────────────────────────
+function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
+  const [selecionados, setSelecionados] = useState([])
+  const [camSel, setCamSel] = useState('')
+
+  // Agrupar por lote
+  const porLote = fretes.reduce((acc, f) => {
+    const key = f.lote_id || f.lote_codigo || f.id
+    if (!acc[key]) acc[key] = []
+    acc[key].push(f)
+    return acc
+  }, {})
+
+  function toggleBloco(f) {
+    setSelecionados(prev => {
+      const jatem = prev.find(x => x.id === f.id)
+      if (jatem) return prev.filter(x => x.id !== f.id)
+      return [...prev, f]
+    })
+  }
+
+  const totalQtd = selecionados.reduce((s, f) => s + f.quantidade, 0)
+  const totalValor = selecionados.reduce((s, f) => s + Number(f.valor), 0)
+  const camLivre = caminhoesLivres.find(c => c.id.toString() === camSel)
+  const cabacidade = camLivre?.capacidade || 0
+  const blocosQueCapaz = cabacidade > 0 ? Math.floor(cabacidade / 30) : 0
+
+  if (fretes.length === 0) return (
+    <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:48, textAlign:'center' }}>
+      <div style={{ fontSize:48, marginBottom:12 }}>🚛</div>
+      <div style={{ fontSize:16, color:T.textMuted }}>Nenhum frete disponível no momento</div>
+      <div style={{ fontSize:12, color:T.textMuted, marginTop:6 }}>Quando alguém comprar gado você será notificado!</div>
+    </div>
+  )
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+      {/* Instrução */}
+      <div style={{ background:T.inputBg, borderRadius:12, padding:'12px 16px', border:`1px solid ${T.border}`, fontSize:13, color:T.textDim, lineHeight:1.6 }}>
+        💡 Selecione os blocos que quer transportar. Cada bloco = 30 cab. Você pode pegar múltiplos blocos — cada um adiciona <strong style={{color:T.text}}>1 hora</strong> na rota.
+      </div>
+
+      {/* Blocos por lote */}
+      {Object.entries(porLote).map(([loteKey, blocos]) => (
+        <div key={loteKey} style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, overflow:'hidden' }}>
+          <div style={{ padding:'12px 18px', borderBottom:`1px solid ${T.border}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>
+                {blocos[0].lote_codigo} — {blocos.reduce((s,b)=>s+b.quantidade,0)} cabeças total
+              </div>
+              <div style={{ fontSize:12, color:T.textMuted }}>{blocos[0].origem} → {blocos[0].destino}</div>
+            </div>
+            <div style={{ fontSize:12, color:T.textMuted }}>{blocos.length} bloco(s)</div>
+          </div>
+          <div style={{ padding:'12px 18px', display:'flex', flexDirection:'column', gap:8 }}>
+            {blocos.map((b, i) => {
+              const sel = !!selecionados.find(x => x.id === b.id)
+              return (
+                <div key={b.id} onClick={() => toggleBloco(b)} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:sel?'rgba(80,48,192,.15)':T.inputBg, border:`1px solid ${sel?'#5030c0':T.border}`, borderRadius:10, cursor:'pointer', transition:'all .15s' }}>
+                  <div style={{ width:22, height:22, borderRadius:6, background:sel?'#6030c0':T.border, border:`2px solid ${sel?'#8060e0':T.border2}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:12, color:'#fff' }}>
+                    {sel?'✓':''}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:T.text }}>Bloco {b.bloco_num||i+1}/{b.bloco_total||blocos.length}</span>
+                    <span style={{ fontSize:12, color:T.textMuted, marginLeft:8 }}>{b.quantidade} cab.</span>
+                  </div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(b.valor)}</div>
+                  <div style={{ fontSize:11, color:T.textMuted, fontStyle:'italic' }}>+15min</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* Painel de confirmação */}
+      {selecionados.length > 0 && (
+        <div style={{ background:'rgba(80,48,192,.1)', border:'1px solid #5030c0', borderRadius:14, padding:'16px 18px' }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'#a080ff', marginBottom:12 }}>
+            {selecionados.length} bloco(s) selecionado(s) — {totalQtd} cabeças
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
+            <div style={{ background:T.inputBg, borderRadius:8, padding:'8px 10px', textAlign:'center', border:`1px solid ${T.border}` }}>
+              <div style={{ fontSize:10, color:T.textMuted, marginBottom:2 }}>DURAÇÃO</div>
+              <div style={{ fontSize:14, fontWeight:700, color:T.text }}>{selecionados.length === 1 ? '1h' : `1h${(selecionados.length-1)*15}min`}</div>
+            </div>
+            <div style={{ background:T.inputBg, borderRadius:8, padding:'8px 10px', textAlign:'center', border:`1px solid ${T.border}` }}>
+              <div style={{ fontSize:10, color:T.textMuted, marginBottom:2 }}>CARGA</div>
+              <div style={{ fontSize:14, fontWeight:700, color:T.text }}>{totalQtd} cab.</div>
+            </div>
+            <div style={{ background:T.inputBg, borderRadius:8, padding:'8px 10px', textAlign:'center', border:`1px solid ${T.border}` }}>
+              <div style={{ fontSize:10, color:T.textMuted, marginBottom:2 }}>GANHO</div>
+              <div style={{ fontSize:14, fontWeight:700, color:'#a080ff' }}>${fmt(totalValor)}</div>
+            </div>
+          </div>
+          {caminhoesLivres.length > 0 ? <>
+            <div style={{ marginBottom:10 }}>
+              <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:6 }}>Selecionar caminhão</label>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {caminhoesLivres.map(c => {
+                  const maxBlocos = Math.floor(c.capacidade / 30)
+                  const insuf = selecionados.length > maxBlocos
+                  return (
+                    <button key={c.id} onClick={() => !insuf && setCamSel(c.id.toString())} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', background:camSel===c.id.toString()?'rgba(80,48,192,.2)':T.inputBg, border:`1px solid ${insuf?'#6a1818':camSel===c.id.toString()?'#5030c0':T.border}`, borderRadius:8, cursor:insuf?'not-allowed':'pointer', fontFamily:'inherit', opacity:insuf?.5:1 }}>
+                      <span>🚛</span>
+                      <div style={{ flex:1, textAlign:'left' }}>
+                        <div style={{ fontSize:12, fontWeight:600, color:insuf?'#e06060':T.text }}>{c.modelo} — {c.capacidade} cab.</div>
+                        <div style={{ fontSize:10, color:T.textMuted }}>Suporta até {maxBlocos} bloco(s){insuf?' — insuficiente':''}</div>
+                      </div>
+                      {camSel===c.id.toString()&&<span style={{color:'#a080ff'}}>✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <button
+              onClick={() => { if(camSel) { const cam=caminhoesLivres.find(c=>c.id.toString()===camSel); onAceitar(selecionados,cam); setSelecionados([]); setCamSel('') }}}
+              disabled={!camSel}
+              style={{ width:'100%', padding:11, background:camSel?'linear-gradient(135deg,#3020a0,#6030c0)':'rgba(80,48,192,.2)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:camSel?'pointer':'not-allowed', fontFamily:'inherit', opacity:camSel?1:.6 }}
+            >
+              🚛 Aceitar {selecionados.length} bloco(s) — ${fmt(totalValor)}
+            </button>
+          </> : <div style={{ fontSize:13, color:'#e06060', textAlign:'center', padding:'8px 0' }}>Sem caminhão livre — compre um na Concessionária</div>}
+        </div>
+      )}
     </div>
   )
 }

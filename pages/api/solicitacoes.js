@@ -110,25 +110,28 @@ export default async function handler(req, res) {
       // Marcar lote como em_transito até frete chegar
       await query(`UPDATE lotes SET status='em_transito' WHERE id=$1`, [lote.id])
 
-      // Criar frete(s) na transportadora — $10/cab
-      // Se quantidade > capacidade máx de 1 caminhão (120), divide em múltiplos fretes
-      const valorPorCab = 10
+      // Criar fretes em blocos de 30 — menor capacidade do sistema
+      // Transportador pode pegar múltiplos blocos, cada bloco = +1h na rota
+      const valorPorCab = 30
+      const BLOCO = 30
       const origemFrete = 'Curral Gov. NPC'
       const destinoFrete = solic.fazenda_id ? `Fazenda ${jogador?.fazenda || solic.jogador_nome}` : `Fazenda de ${solic.jogador_nome}`
-      const capMaxCaminhao = 120 // capacidade do maior caminhão
       let qtdRestante = solic.quantidade
       let numFretes = 0
+      let blocoNum = 1
       while (qtdRestante > 0) {
-        const qtdEste = Math.min(qtdRestante, capMaxCaminhao)
+        const qtdEste = Math.min(qtdRestante, BLOCO)
         const valorEste = qtdEste * valorPorCab
         await query(
           `INSERT INTO fretes_transportadora
-           (lote_id, lote_codigo, origem, destino, quantidade, valor, comprador_id, status, criado_em)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel',now())`,
-          [lote.id, codigo, origemFrete, destinoFrete, qtdEste, valorEste, solic.jogador_id]
+           (lote_id, lote_codigo, origem, destino, quantidade, valor, comprador_id, status, criado_em, bloco_num, bloco_total)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel',now(),$8,$9)`,
+          [lote.id, codigo, origemFrete, destinoFrete, qtdEste, valorEste, solic.jogador_id,
+           blocoNum, Math.ceil(solic.quantidade / BLOCO)]
         )
         qtdRestante -= qtdEste
         numFretes++
+        blocoNum++
       }
       const valorFreteTotal = solic.quantidade * valorPorCab
 
