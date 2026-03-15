@@ -1091,7 +1091,7 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
                   </div>
                   <div style={{ textAlign:'right' }}>
                     <div style={{ fontSize:22, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
-                    <div style={{ fontSize:11, color:T.textMuted }}>${10}/cab</div>
+                    <div style={{ fontSize:11, color:T.textMuted }}>$30/cab (você recebe)</div>
                   </div>
                   <button
                     onClick={() => { setAceitando(f); setCaminhaoSel(caminhoesLivres[0]?.id?.toString() || '') }}
