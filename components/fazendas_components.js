@@ -1155,7 +1155,7 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
             <div style={{ background:T.inputBg, borderRadius:12, padding:16, marginBottom:16, border:`1px solid ${T.border}` }}>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:8 }}>
                 <span style={{ color:T.textMuted }}>Carga</span>
-                <span style={{ fontWeight:700, color:T.text }}>{aceitando.totalQtd||aceitando.quantidade} bezerros {aceitando.numBlocos>1&&<span style={{fontSize:11,color:'#a080ff'}}>({aceitando.numBlocos} blocos)</span>}</span>
+                <span style={{ fontWeight:700, color:T.text }}>{aceitando.totalQtd||aceitando.quantidade} {aceitando.tipo_carga==='racao'?'kg de ração':'bezerros'} {aceitando.numBlocos>1&&<span style={{fontSize:11,color:'#a080ff'}}>({aceitando.numBlocos} blocos)</span>}</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:8 }}>
                 <span style={{ color:T.textMuted }}>Rota</span>
@@ -1730,7 +1730,7 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
       {/* Instrução */}
       <div style={{ background:T.inputBg, borderRadius:12, padding:'12px 16px', border:`1px solid ${T.border}`, fontSize:13, color:T.textDim, lineHeight:1.6 }}>
-        💡 Selecione os blocos que quer transportar. Cada bloco = 30 cab. Você pode pegar múltiplos blocos — cada um adiciona <strong style={{color:T.text}}>1 hora</strong> na rota.
+        💡 Selecione os blocos que quer transportar. {fretes[0]?.tipo_carga==='racao'?'Cada bloco = 1.500kg de ração.':'Cada bloco = 30 cab.'} Você pode pegar múltiplos blocos — cada um adiciona <strong style={{color:T.text}}>+15min</strong> na rota.
       </div>
 
       {/* Blocos por lote */}
@@ -1739,7 +1739,7 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
           <div style={{ padding:'12px 18px', borderBottom:`1px solid ${T.border}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div>
               <div style={{ fontSize:14, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>
-                {blocos[0].lote_codigo} — {blocos.reduce((s,b)=>s+b.quantidade,0)} cabeças total
+                {blocos[0].lote_codigo} — {blocos.reduce((s,b)=>s+b.quantidade,0)} {blocos[0].tipo_carga==='racao'?'kg total':'cabeças total'}
               </div>
               <div style={{ fontSize:12, color:T.textMuted }}>{blocos[0].origem} → {blocos[0].destino}</div>
             </div>
@@ -1755,7 +1755,7 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
                   </div>
                   <div style={{ flex:1 }}>
                     <span style={{ fontSize:13, fontWeight:600, color:T.text }}>Bloco {b.bloco_num||i+1}/{b.bloco_total||blocos.length}</span>
-                    <span style={{ fontSize:12, color:T.textMuted, marginLeft:8 }}>{b.quantidade} cab.</span>
+                    <span style={{ fontSize:12, color:T.textMuted, marginLeft:8 }}>{b.quantidade} {b.tipo_carga==='racao'?'kg':'cab.'}</span>
                   </div>
                   <div style={{ fontSize:14, fontWeight:700, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(b.valor)}</div>
                   <div style={{ fontSize:11, color:T.textMuted, fontStyle:'italic' }}>+15min</div>
@@ -1779,7 +1779,7 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
             </div>
             <div style={{ background:T.inputBg, borderRadius:8, padding:'8px 10px', textAlign:'center', border:`1px solid ${T.border}` }}>
               <div style={{ fontSize:10, color:T.textMuted, marginBottom:2 }}>CARGA</div>
-              <div style={{ fontSize:14, fontWeight:700, color:T.text }}>{totalQtd} cab.</div>
+              <div style={{ fontSize:14, fontWeight:700, color:T.text }}>{totalQtd} {selecionados[0]?.tipo_carga==='racao'?'kg':'cab.'}</div>
             </div>
             <div style={{ background:T.inputBg, borderRadius:8, padding:'8px 10px', textAlign:'center', border:`1px solid ${T.border}` }}>
               <div style={{ fontSize:10, color:T.textMuted, marginBottom:2 }}>GANHO</div>
