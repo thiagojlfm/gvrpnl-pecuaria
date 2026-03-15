@@ -45,7 +45,8 @@ export default async function handler(req, res) {
 
     return res.json({
       pedidos: pedidos || [],
-      necessidade: { kgNecessario, kgDisponivel, kgFaltando, detalhes }
+      necessidade: { kgNecessario, kgDisponivel, kgFaltando, detalhes },
+      frete_kg: 0.5
     })
   }
 
@@ -64,12 +65,16 @@ export default async function handler(req, res) {
     if (total > 600) precoKg = 3
     else if (total > 400) precoKg = 2.4
 
-    const valorTotal = Math.round(kg_solicitado * precoKg * 100) / 100
+    // Frete: $0.50/kg — cliente paga, transportador recebe
+    const freteKg = 0.5
+    const valorRacao = Math.round(kg_solicitado * precoKg * 100) / 100
+    const valorFrete = Math.round(kg_solicitado * freteKg * 100) / 100
+    const valorTotal = valorRacao + valorFrete
 
     const { data, error } = await queryOne(
-      `INSERT INTO pedidos_racao (jogador_id, jogador_nome, fazenda_id, kg_solicitado, valor_total, preco_kg, comprovante, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'pendente') RETURNING *`,
-      [user.id, user.username, fazenda_id||null, kg_solicitado, valorTotal, precoKg, comprovante||null]
+      `INSERT INTO pedidos_racao (jogador_id, jogador_nome, fazenda_id, kg_solicitado, valor_total, preco_kg, valor_frete, comprovante, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pendente') RETURNING *`,
+      [user.id, user.username, fazenda_id||null, kg_solicitado, valorTotal, precoKg, valorFrete, comprovante||null]
     )
     if (error) return res.status(500).json({ error: error.message })
     return res.json(data)
@@ -93,14 +98,44 @@ export default async function handler(req, res) {
          ON CONFLICT (jogador_id) DO UPDATE SET kg_disponivel = estoque_racao.kg_disponivel + $2`,
         [pedido.jogador_id, pedido.kg_solicitado]
       )
-      // Notificar
+      // Notificar jogador
       await query(
         `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
         [pedido.jogador_id, '🌾 Ração entregue!',
-         `${pedido.kg_solicitado}kg de ração creditados no seu estoque.`]
+         `${pedido.kg_solicitado}kg creditados. Frete sendo despachado pela transportadora.`]
       )
+      // Criar frete de ração na transportadora — blocos de 1.500kg (Truck Pequeno)
+      const BLOCO_RACAO = 1500
+      const freteValorPorBloco = BLOCO_RACAO * 0.5
+      let kgRestante = Number(pedido.kg_solicitado)
+      let blocoNum = 1
+      const blocoTotal = Math.ceil(kgRestante / BLOCO_RACAO)
+      while (kgRestante > 0) {
+        const kgEste = Math.min(kgRestante, BLOCO_RACAO)
+        const valorEste = Math.round(kgEste * 0.5 * 100) / 100
+        await query(
+          `INSERT INTO fretes_transportadora
+           (lote_codigo, origem, destino, quantidade, valor, comprador_id, status, bloco_num, bloco_total, tipo_carga)
+           VALUES ($1,$2,$3,$4,$5,$6,'disponivel',$7,$8,'racao')`,
+          [`RAC-${id}`, 'Celeiro Central', pedido.jogador_nome, kgEste, valorEste,
+           pedido.jogador_id, blocoNum, blocoTotal]
+        )
+        kgRestante -= kgEste
+        blocoNum++
+      }
+      // Notificar transportadores
+      const { data: transportadores } = await query(
+        `SELECT DISTINCT jogador_id FROM caminhoes WHERE status='disponivel'`, []
+      )
+      for (const t of (transportadores||[])) {
+        await query(
+          `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+          [t.jogador_id, '🌾 Frete de ração disponível!',
+           `${pedido.kg_solicitado}kg para entregar — $${pedido.valor_frete||0} total. Acesse a Transportadora!`]
+        )
+      }
       await query(`INSERT INTO admin_log (admin_nome, acao, detalhes) VALUES ($1,$2,$3)`,
-        [user.username, 'Ração entregue', `${pedido.jogador_nome} — ${pedido.kg_solicitado}kg — $${pedido.valor_total}`])
+        [user.username, 'Ração entregue + frete criado', `${pedido.jogador_nome} — ${pedido.kg_solicitado}kg`])
     }
 
     return res.json({ ok: true })

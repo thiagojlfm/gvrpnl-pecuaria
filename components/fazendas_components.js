@@ -632,7 +632,9 @@ export function CeleiroPage({ T, user, api, notify, mercado, sounds }) {
 
   const precoRacao = mercado?.precos?.precoRacao || 2
   const kgNum = parseFloat(kgSolicitado) || 0
-  const valorTotal = Math.round(kgNum * precoRacao * 100) / 100
+  const valorRacao = Math.round(kgNum * precoRacao * 100) / 100
+  const valorFrete = Math.round(kgNum * 0.5 * 100) / 100
+  const valorTotal = valorRacao + valorFrete
 
   async function enviarPedido() {
     if (!comprovante) return notify('Cole o link do comprovante!', 'danger')
@@ -735,12 +737,16 @@ export function CeleiroPage({ T, user, api, notify, mercado, sounds }) {
                 {kgNum > 0 && (
                   <div style={{ background: T.inputBg, borderRadius: 10, padding: 14, marginBottom: 16, border: `1px solid ${T.border}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8, color: T.textDim }}>
-                      <span>{kgNum}kg × ${precoRacao}/kg</span>
-                      <span style={{ fontWeight: 600 }}>${fmt(valorTotal)}</span>
+                      <span>Ração: {kgNum}kg × ${precoRacao}/kg</span>
+                      <span>${fmt(Math.round(kgNum * precoRacao * 100)/100)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8, color: T.textDim }}>
+                      <span>Frete: {kgNum}kg × $0,50/kg</span>
+                      <span>${fmt(Math.round(kgNum * 0.5 * 100)/100)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, fontFamily: "'Playfair Display',serif", borderTop:`1px solid ${T.border}`, paddingTop: 10 }}>
                       <span style={{ color: T.text }}>Total</span>
-                      <span style={{ color: T.gold || '#c8922a' }}>${fmt(valorTotal)}</span>
+                      <span style={{ color: T.gold || '#c8922a' }}>${fmt(Math.round((kgNum * precoRacao + kgNum * 0.5) * 100)/100)}</span>
                     </div>
                   </div>
                 )}
@@ -1357,7 +1363,11 @@ export function ConcessionariaPage({ T, user, api, notify, sounds }) {
               </div>
               <div style={{ padding:'16px 18px' }}>
                 <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:T.text, marginBottom:4 }}>{m.modelo}</div>
-                <div style={{ fontSize:12, color:T.textMuted, marginBottom:12, lineHeight:1.6 }}>{m.descricao}</div>
+                <div style={{ fontSize:12, color:T.textMuted, marginBottom:8, lineHeight:1.6 }}>{m.descricao}</div>
+                <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
+                  <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🐄 {m.capacidade} cab.</span>
+                  <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border2}`, color:T.gold||'#c8922a', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌾 {fmt(m.racao_cap||0)}kg ração</span>
+                </div>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                   <div style={{ fontSize:22, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(m.preco)}</div>
                   <button onClick={()=>{setModeloSel(m);setStep(2)}} style={{ padding:'8px 16px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar</button>
