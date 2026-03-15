@@ -886,7 +886,6 @@ export function FreteTracker2({ frete, T, onUpdate }) {
       } else {
         setFase('entregue')
         setPct(100)
-        onUpdate && onUpdate()
       }
     }
     update()
@@ -1050,7 +1049,7 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
                 </div>
                 <div style={{ fontSize:18, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
               </div>
-              <FreteEmAndamento frete={f} T={T} onEntregue={() => { sounds?.coin(); load() }}/>
+              <FreteEmAndamento frete={f} T={T} api={api} token={typeof window!=='undefined'?localStorage.getItem('gvrpnl_token'):null} onEntregue={() => { sounds?.coin(); load() }}/>
             </div>
           ))}
         </div>

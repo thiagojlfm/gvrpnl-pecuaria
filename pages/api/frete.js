@@ -43,13 +43,27 @@ export default async function handler(req, res) {
     const { data } = await queryOne(
       `UPDATE frete SET status=$1 WHERE id=$2 RETURNING *`, [status, id]
     )
-    // When delivered, set lote to ativo
+    // When delivered, set lote to ativo and free caminhao
     if (status === 'entregue' && data?.lote_id) {
       await query(`UPDATE lotes SET status='ativo' WHERE id=$1`, [data.lote_id])
       await query(
         `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
         [data.jogador_id, '🐄 Bezerros chegaram!', 'Seu gado foi entregue na fazenda e já está no seu rebanho!']
       )
+    }
+    // Free caminhao if any frete_transportadora is stuck
+    if (status === 'entregue') {
+      const { data: fretesTrans } = await query(
+        `SELECT id, caminhao_id FROM fretes_transportadora 
+         WHERE lote_id = $1 AND status IN ('em_rota_buscar','em_rota_fazenda')`,
+        [data?.lote_id]
+      )
+      for (const ft of (fretesTrans||[])) {
+        await query(`UPDATE fretes_transportadora SET status='entregue' WHERE id=$1`, [ft.id])
+        if (ft.caminhao_id) {
+          await query(`UPDATE caminhoes SET status='disponivel' WHERE id=$1`, [ft.caminhao_id])
+        }
+      }
     }
     return res.json(data)
   }
