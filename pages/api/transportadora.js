@@ -174,15 +174,31 @@ export default async function handler(req, res) {
       // Se entregue, liberar caminhão
       if (status === 'entregue' && frete?.caminhao_id) {
         await query(`UPDATE caminhoes SET status='disponivel' WHERE id=$1`, [frete.caminhao_id])
+
+        // Se for ração, creditar no estoque do comprador
+        if (frete.tipo_carga === 'racao') {
+          await query(
+            `INSERT INTO estoque_racao (jogador_id, kg_disponivel)
+             VALUES ($1, $2)
+             ON CONFLICT (jogador_id) DO UPDATE SET kg_disponivel = estoque_racao.kg_disponivel + $2`,
+            [frete.comprador_id, frete.quantidade]
+          )
+          await query(
+            `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+            [frete.comprador_id, '🌾 Ração chegou!',
+             `${frete.quantidade}kg de ração entregues e creditados no seu estoque!`]
+          )
+        }
+
         // Notificar transportador
         await query(
           `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
           [frete.transportador_id, '✅ Entrega concluída!',
-           `Frete ${frete.lote_codigo} entregue. $${frete.valor} aguardando pagamento do admin.`]
+           `${frete.tipo_carga === 'racao' ? '🌾' : '🐄'} Frete ${frete.lote_codigo} entregue. $${frete.valor} aguardando pagamento do admin.`]
         )
       }
-      // Se em_rota_fazenda, notificar dono
-      if (status === 'em_rota_fazenda' && frete?.comprador_id) {
+      // Se em_rota_fazenda, notificar dono (só gado)
+      if (status === 'em_rota_fazenda' && frete?.comprador_id && frete.tipo_carga !== 'racao') {
         await query(
           `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
           [frete.comprador_id, '🐄 Gado a caminho!',
