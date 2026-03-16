@@ -372,7 +372,7 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
     const h = token ? { Authorization: `Bearer ${token}` } : {}
     const [fRes, frRes] = await Promise.all([
       fetch('/api/fazendas?minha=1', { headers: h }).then(r => r.json()),
-      fetch(`/api/frete?jogador_id=${user.id}`, { headers: h }).then(r => r.json()),
+      fetch(`/api/frete?jogador_id=${user.id}`, { headers: h }).then(r => r.json()).catch(()=>[]),
     ])
     const f = fRes || []
     setFazendas(f)
@@ -388,7 +388,7 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
     api(`/api/custos?fazenda_id=${selectedFaz.id}`).then(setCustos)
   }, [selectedFaz, api])
 
-  const minhasLotes = (lotes||[]).filter(l => l.fazenda_id === selectedFaz?.id)
+  const minhasLotes = (lotes||[]).filter(l => String(l.fazenda_id) === String(selectedFaz?.id))
   const cap = selectedFaz ? calcCapacidade(minhasLotes, Number(selectedFaz.tamanho_ha)) : null
   const vaqueirosNec = Math.floor(minhasLotes.reduce((s,l)=>s+l.quantidade,0) / 60)
   const custosPend = custos.filter(c => c.status === 'pendente').length
@@ -1837,6 +1837,14 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
 // ─── Frete Ração Card ─────────────────────────────────────────────────────────
 export function FreteRacaoCard({ frete, T, user, api, notify, sounds, onReload }) {
   const [loading, setLoading] = useState(false)
+  const [vans, setVans] = useState([])
+  const [vanSel, setVanSel] = useState('')
+
+  useEffect(() => {
+    if (user?.role === 'admin' && frete.status === 'aguardando_liberacao') {
+      api('/api/transportadora?tipo=vans_disponiveis').then(d => setVans(Array.isArray(d)?d:[]))
+    }
+  }, [user, frete.status, api])
 
   const STATUS = {
     aguardando_liberacao: { label:'⏳ Aguardando liberação', color:'#e09030', bg:'rgba(42,24,0,.6)', border:'#8a4010' },
@@ -1850,11 +1858,11 @@ export function FreteRacaoCard({ frete, T, user, api, notify, sounds, onReload }
   const isTransportador = String(frete.transportador_id) === String(user?.id)
   const isProdutor = String(frete.comprador_id) === String(user?.id)
 
-  async function avancar(novoStatus) {
+  async function avancar(novoStatus, extra={}) {
     setLoading(true)
     const r = await api('/api/transportadora', {
       method: 'PATCH',
-      body: JSON.stringify({ id: frete.id, status: novoStatus })
+      body: JSON.stringify({ id: frete.id, status: novoStatus, ...extra })
     })
     setLoading(false)
     if (r.error) return notify('Erro: ' + r.error, 'danger')
@@ -1919,11 +1927,41 @@ export function FreteRacaoCard({ frete, T, user, api, notify, sounds, onReload }
 
       {/* Action buttons */}
       <div style={{ display:'flex', gap:8 }}>
-        {/* Admin libera */}
+        {/* Admin atribui van e libera */}
         {isAdmin && frete.status === 'aguardando_liberacao' && (
-          <button onClick={() => avancar('liberado')} disabled={loading} style={{ flex:1, padding:'9px 0', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-            {loading ? '...' : '✅ Liberar no armazém'}
-          </button>
+          <div style={{ flex:1, display:'flex', flexDirection:'column', gap:8 }}>
+            {vans.length === 0 ? (
+              <div style={{ fontSize:12, color:'#e06060', padding:'8px 12px', background:'rgba(42,10,10,.4)', borderRadius:8, border:'1px solid #6a1818' }}>
+                ⚠ Nenhuma van disponível — aguarde um transportador ficar livre
+              </div>
+            ) : (
+              <>
+                <select value={vanSel} onChange={e=>setVanSel(e.target.value)} style={{ width:'100%', background:T.inputBg, border:`1px solid ${T.border2}`, borderRadius:8, padding:'8px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}>
+                  <option value="">— Selecionar van —</option>
+                  {vans.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.nome_transportadora||v.modelo} · {v.dono} · {fmt(v.racao_cap)}kg cap.
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    if (!vanSel) return notify('Selecione uma van!','danger')
+                    const van = vans.find(v=>v.id.toString()===vanSel)
+                    avancar('atribuir', {
+                      transportador_id: van.jogador_id,
+                      transportador_nome: van.dono,
+                      caminhao_id: parseInt(vanSel)
+                    })
+                  }}
+                  disabled={loading||!vanSel}
+                  style={{ padding:'9px 0', background:vanSel?'linear-gradient(135deg,#3020a0,#6030c0)':'rgba(80,48,192,.2)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:vanSel?'pointer':'not-allowed', fontFamily:'inherit' }}
+                >
+                  {loading ? '...' : '✅ Atribuir e liberar'}
+                </button>
+              </>
+            )}
+          </div>
         )}
 
         {/* Transportador retira */}

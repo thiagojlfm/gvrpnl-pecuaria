@@ -838,7 +838,7 @@ export default function App() {
               </Card>
               <Card T={T} hover={false}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:T.text,marginBottom:14}}>Minhas solicitações</div>
-                <Tbl T={T} headers={['Data','Qtd','Total','Status']} rows={solic.map(s=>[
+                <Tbl T={T} headers={['Data','Qtd','Total','Status']} rows={solic.filter(s=>String(s.jogador_id)===String(user?.id)).map(s=>[
                   new Date(s.criado_em).toLocaleDateString('pt-BR'),`${s.quantidade} cab.`,`$${fmt(s.valor_total)}`,
                   <Badge type={s.status==='aprovado'?'ok':s.status==='recusado'?'danger':'warn'}>{s.status==='aprovado'?'✓ Aprovado':s.status==='recusado'?'✗ Recusado':'⏳ Pendente'}</Badge>
                 ])}/>
@@ -852,12 +852,12 @@ export default function App() {
             <SectionTitle T={T} icon="🐄" title="Meu Rebanho" sub={`${user.username}${user.fazenda?` · Fazenda ${user.fazenda}`:''}`}/>
             {diasRacaoLeft!==null&&diasRacaoLeft<=3&&<Alrt type="danger">⚠ Ração acabando! Estoque para apenas {diasRacaoLeft} dia(s) — consumo atual: {consumoDiario}kg/dia.</Alrt>}
             <div style={{...gs(150),marginBottom:20}}>
-              <Metric T={T} icon="🐄" label="Cabeças ativas" value={meusLotes.filter(l=>['ativo','aguardando_pagamento'].includes(l.status)).reduce((s,l)=>s+l.quantidade,0)}/>
+              <Metric T={T} icon="🐄" label="Cabeças ativas" value={meusLotes.filter(l=>['ativo','aguardando_pagamento','em_transito'].includes(l.status)).reduce((s,l)=>s+l.quantidade,0)}/>
               <Metric T={T} icon="🌾" label="Estoque ração" value={`${fmt(racao?.kg_disponivel||0)} kg`} sub={diasRacaoLeft!==null?`${diasRacaoLeft} dias restantes`:'sem gado ativo'} color={diasRacaoLeft!==null&&diasRacaoLeft<=3?T.red:T.gold}/>
               <Metric T={T} icon="📉" label="Consumo/dia" value={`${consumoDiario} kg`} sub="todos os lotes"/>
               <Metric T={T} icon="💰" label="Valor do rebanho" value={`$${fmt(meusLotes.filter(l=>['ativo','em_transito'].includes(l.status)).reduce((s,l)=>{const precoFase={bezerro:mercado?.precos?.bezerro||1100,garrote:mercado?.precos?.garrote||0,boi:mercado?.precos?.boi||0,abatido:mercado?.precos?.abate||0};return s+(precoFase[l.fase]||0)*l.quantidade},0))}`} color={T.gold}/>
             </div>
-            {meusLotes.length===0?<Card T={T} hover={false} style={{textAlign:'center',padding:48}}>
+            {meusLotes.filter(l=>!['pago','vendido'].includes(l.status)).length===0?<Card T={T} hover={false} style={{textAlign:'center',padding:48}}>
               <div style={{fontSize:48,marginBottom:16}}>🐄</div>
               <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:T.text,marginBottom:8}}>Nenhum lote ativo</h3>
               <p style={{fontSize:13,color:T.textMuted,marginBottom:20}}>Vá até a aba Comprar para iniciar seu rebanho</p>
@@ -1266,7 +1266,7 @@ export default function App() {
                   <span style={{fontWeight:600}}>{s.jogador_nome}</span>,`${s.quantidade} cab.`,
                   <span style={{color:T.gold,fontWeight:700,fontFamily:"'Playfair Display',serif"}}>${fmt(s.valor_total)}</span>,
                   <a href={s.comprovante} target="_blank" rel="noreferrer" style={{color:'#4a90d0',fontSize:12}}>Ver →</a>,
-                  <Btn T={T} onClick={async()=>{await api('/api/solicitacoes',{method:'PATCH',body:JSON.stringify({id:s.id,status:'aprovado'})});sounds.coin();notify('✓ Aprovado!');api('/api/solicitacoes').then(setSolic)}} style={{padding:'5px 12px',fontSize:11}}>✓ Aprovar</Btn>,
+                  <Btn T={T} onClick={async()=>{const r=await api('/api/solicitacoes',{method:'PATCH',body:JSON.stringify({id:s.id,status:'aprovado'})});if(r.error){notify('Erro: '+r.error,'danger')}else{sounds.coin();notify('✓ Aprovado! Lote '+r.codigo+' criado.');api('/api/solicitacoes').then(setSolic);api('/api/lotes').then(setLotes)}}} style={{padding:'5px 12px',fontSize:11}}>✓ Aprovar</Btn>,
                   <Btn T={T} v="danger" onClick={async()=>{await api('/api/solicitacoes',{method:'PATCH',body:JSON.stringify({id:s.id,status:'recusado'})});notify('Recusado.','danger');api('/api/solicitacoes').then(setSolic)}} style={{padding:'5px 12px',fontSize:11}}>✗</Btn>
                 ])}/>
             </Card>
@@ -1311,7 +1311,7 @@ export default function App() {
                   <span style={{fontWeight:600}}>{l.jogador_nome}</span>,
                   l.fazenda||'—',l.codigo,l.quantidade,faseBadge(l.fase),
                   <CountdownRing dataFase={l.data_fase4} T={T} size={36}/>,
-                  <Badge type={l.status==='ativo'?'gray':l.status==='aguardando_pagamento'?'amber':'ok'}>{l.status==='ativo'?'Ativo':l.status==='aguardando_pagamento'?'Aguard.':l.status}</Badge>,
+                  <Badge type={l.status==='ativo'?'gray':l.status==='aguardando_pagamento'?'amber':l.status==='em_transito'?'info':'ok'}>{l.status==='ativo'?'Ativo':l.status==='aguardando_pagamento'?'Aguard.':l.status==='em_transito'?'🚛 A caminho':'✓ Pago'}</Badge>,
                   l.fase!=='abatido'&&l.status==='ativo'?<Btn T={T} v="ghost" onClick={async()=>{const r=await api(`/api/lotes/${l.id}`,{method:'PATCH',body:JSON.stringify({action:'avancar_fase'})});if(!r.error){sounds.phase();notify('Fase avançada!');reload()}}} style={{padding:'5px 10px',fontSize:11}}>Avançar</Btn>:'—',
                   <Btn T={T} v="danger" onClick={async()=>{await api('/api/admin/reset',{method:'POST',body:JSON.stringify({tipo:'lote',lote_id:l.id})});notify('Lote removido.');api('/api/lotes').then(setLotes)}} style={{padding:'4px 8px',fontSize:11}}>✕</Btn>
                 ])}/>

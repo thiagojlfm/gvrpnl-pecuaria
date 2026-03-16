@@ -48,10 +48,10 @@ export default async function handler(req, res) {
       // Get jogador info
       const { data: jogador } = await queryOne(`SELECT * FROM usuarios WHERE id = $1`, [solic.jogador_id])
 
-      // Count lotes for codigo
-      const { data: countData } = await query('SELECT COUNT(*) FROM lotes', [])
-      const count = parseInt(countData?.[0]?.count || 0)
-      const codigo = `L-${String(count + 1).padStart(3, '0')}`
+      // Generate unique codigo using MAX id
+      const { data: maxData } = await query("SELECT COALESCE(MAX(CAST(SUBSTRING(codigo FROM 3) AS INTEGER)),0) as mx FROM lotes WHERE codigo ~ '^L-[0-9]+'", [])
+      const nextNum = (parseInt(maxData?.[0]?.mx || 0)) + 1
+      const codigo = `L-${String(nextNum).padStart(3, '0')}`
 
       // Datas
       const hoje = new Date()
@@ -66,14 +66,15 @@ export default async function handler(req, res) {
          VALUES ($1,$2,$3,$4,$5,$6,'bezerro',180,$7,$8,$9,$10,$11,'ativo',$12) RETURNING *`,
         [codigo, solic.jogador_id, solic.jogador_nome || jogador?.username,
          jogador?.fazenda || '', solic.fazenda_id || null,
-         solic.quantidade, solic.valor_total / solic.quantidade,
+         solic.quantidade, solic.quantidade > 0 ? (solic.valor_total / solic.quantidade) : 1100,
          hoje.toISOString().split('T')[0],
          fase2.toISOString().split('T')[0],
          fase3.toISOString().split('T')[0],
          fase4.toISOString().split('T')[0],
          solic.comprovante]
       )
-      if (loteErr) return res.status(500).json({ error: 'Solicitação aprovada mas erro ao criar lote: ' + loteErr.message })
+      if (loteErr) return res.status(500).json({ error: 'Erro ao criar lote: ' + loteErr.message })
+      if (!lote) return res.status(500).json({ error: 'Lote não foi criado — verifique os dados da solicitação' })
 
       // Record transaction
       await query(
@@ -110,8 +111,7 @@ export default async function handler(req, res) {
       // Marcar lote como em_transito até frete chegar
       await query(`UPDATE lotes SET status='em_transito' WHERE id=$1`, [lote.id])
 
-      // Criar fretes em blocos de 30 — menor capacidade do sistema
-      // Transportador pode pegar múltiplos blocos, cada bloco = +1h na rota
+      // Criar fretes em blocos de 30
       const valorPorCab = 30
       const BLOCO = 30
       const origemFrete = 'Curral Gov. NPC'
@@ -119,19 +119,25 @@ export default async function handler(req, res) {
       let qtdRestante = solic.quantidade
       let numFretes = 0
       let blocoNum = 1
-      while (qtdRestante > 0) {
-        const qtdEste = Math.min(qtdRestante, BLOCO)
-        const valorEste = qtdEste * valorPorCab
-        await query(
-          `INSERT INTO fretes_transportadora
-           (lote_id, lote_codigo, origem, destino, quantidade, valor, comprador_id, status, criado_em, bloco_num, bloco_total)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel',now(),$8,$9)`,
-          [lote.id, codigo, origemFrete, destinoFrete, qtdEste, valorEste, solic.jogador_id,
-           blocoNum, Math.ceil(solic.quantidade / BLOCO)]
-        )
-        qtdRestante -= qtdEste
-        numFretes++
-        blocoNum++
+      const blocoTotal = Math.ceil(solic.quantidade / BLOCO)
+      try {
+        while (qtdRestante > 0) {
+          const qtdEste = Math.min(qtdRestante, BLOCO)
+          const valorEste = qtdEste * valorPorCab
+          await query(
+            `INSERT INTO fretes_transportadora
+             (lote_id, lote_codigo, origem, destino, quantidade, valor, comprador_id, status, criado_em, bloco_num, bloco_total)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel',now(),$8,$9)`,
+            [lote.id, codigo, origemFrete, destinoFrete, qtdEste, valorEste, solic.jogador_id,
+             blocoNum, blocoTotal]
+          )
+          qtdRestante -= qtdEste
+          numFretes++
+          blocoNum++
+        }
+      } catch(freteErr) {
+        console.error('Erro ao criar fretes_transportadora:', freteErr.message)
+        // Não falha o approval por causa disso
       }
       const valorFreteTotal = solic.quantidade * valorPorCab
 
