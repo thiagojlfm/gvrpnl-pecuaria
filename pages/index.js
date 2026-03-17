@@ -265,7 +265,9 @@ function ChatPanel({anuncio, user, token, onClose, T}) {
 
   useEffect(() => {
     lastIdRef.current=0; setMsgs([]); fetchMsgs(0)
-    const iv = setInterval(()=>fetchMsgs(lastIdRef.current), 3000)
+    const iv = setInterval(()=>{
+      if(!document.hidden) fetchMsgs(lastIdRef.current)
+    }, 8000)
     return ()=>clearInterval(iv)
   },[fetchMsgs])
 
@@ -557,7 +559,9 @@ export default function App() {
 
   useEffect(()=>{
     if(!token) return
-    const iv = setInterval(()=>api('/api/notificacoes').then(setNotifs), 15000)
+    const iv = setInterval(()=>{
+      if(!document.hidden) api('/api/notificacoes').then(setNotifs)
+    }, 60000)
     return ()=>clearInterval(iv)
   },[token,api])
 
