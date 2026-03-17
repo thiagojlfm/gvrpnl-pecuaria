@@ -388,7 +388,11 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
     api(`/api/custos?fazenda_id=${selectedFaz.id}`).then(setCustos)
   }, [selectedFaz, api])
 
-  const minhasLotes = (lotes||[]).filter(l => String(l.fazenda_id) === String(selectedFaz?.id))
+  // Match lotes by fazenda_id OR by jogador ownership (for lotes without fazenda_id)
+  const minhasLotes = (lotes||[]).filter(l => 
+    String(l.fazenda_id) === String(selectedFaz?.id) ||
+    (l.fazenda_id === null && String(l.jogador_id) === String(user?.id))
+  )
   const cap = selectedFaz ? calcCapacidade(minhasLotes, Number(selectedFaz.tamanho_ha)) : null
   const vaqueirosNec = Math.floor(minhasLotes.reduce((s,l)=>s+l.quantidade,0) / 60)
   const custosPend = custos.filter(c => c.status === 'pendente').length
@@ -981,7 +985,7 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
   // Poll fretes disponíveis a cada 10s
   useEffect(() => {
     if (!user) return
-    const iv = setInterval(() => api('/api/transportadora?tipo=disponiveis').then(f => setFretes(Array.isArray(f)?f:[])), 10000)
+    const iv = setInterval(() => { if(!document.hidden) api('/api/transportadora?tipo=disponiveis').then(f => setFretes(Array.isArray(f)?f:[])) }, 15000)
     return () => clearInterval(iv)
   }, [user, api])
 
@@ -1805,8 +1809,9 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
               <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:6 }}>Selecionar caminhão</label>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 {caminhoesLivres.map(c => {
-                  const maxBlocos = Math.floor(c.capacidade / 30)
-                  const insuf = selecionados.length > maxBlocos
+                  const isRacao = selecionados[0]?.tipo_carga === 'racao'
+                  const maxBlocos = isRacao ? Math.floor((c.racao_cap||0) / 1500) : Math.floor(c.capacidade / 30)
+                  const insuf = selecionados.length > maxBlocos || (isRacao && (c.racao_cap||0) === 0)
                   return (
                     <button key={c.id} onClick={() => !insuf && setCamSel(c.id.toString())} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', background:camSel===c.id.toString()?'rgba(80,48,192,.2)':T.inputBg, border:`1px solid ${insuf?'#6a1818':camSel===c.id.toString()?'#5030c0':T.border}`, borderRadius:8, cursor:insuf?'not-allowed':'pointer', fontFamily:'inherit', opacity:insuf?.5:1 }}>
                       <span>🚛</span>
