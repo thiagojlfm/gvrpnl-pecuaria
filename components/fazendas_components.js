@@ -1061,7 +1061,7 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
                 </div>
                 <div style={{ fontSize:18, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
               </div>
-              <FreteEmAndamento frete={f} T={T} api={api} token={typeof window!=='undefined'?localStorage.getItem('gvrpnl_token'):null} onEntregue={() => { sounds?.coin(); load() }}/>
+              <FreteEmAndamento frete={f} T={T} api={api} onEntregue={() => { sounds?.coin(); load() }}/>
             </div>
           ))}
         </div>
@@ -1216,16 +1216,17 @@ export function TransportadoraPage({ T, user, api, notify, sounds }) {
 }
 
 // ─── Frete em andamento (mini tracker) ───────────────────────────────────────
-function FreteEmAndamento({ frete, T, onEntregue }) {
+function FreteEmAndamento({ frete, T, onEntregue, api }) {
   const [fase, setFase] = useState('buscar')
   const [segundos, setSegundos] = useState(0)
   const [pct, setPct] = useState(0)
+  const [liberando, setLiberando] = useState(false)
 
   useEffect(() => {
     if (!frete) return
     const update = () => {
       const agora = Date.now()
-      const chegaEm = new Date(frete.entrega_em || frete.chega_em).getTime()
+      const chegaEm = new Date(frete.entrega_em || frete.chegada_fazenda_em || frete.chega_em).getTime()
       const inicio = chegaEm - 60*60*1000
       const meio = inicio + 30*60*1000
 
@@ -1240,25 +1241,39 @@ function FreteEmAndamento({ frete, T, onEntregue }) {
       } else {
         setFase('entregue')
         setPct(100)
-        onEntregue && onEntregue()
+        setSegundos(0)
       }
     }
     update()
     const iv = setInterval(update, 1000)
     return () => clearInterval(iv)
-  }, [frete, onEntregue])
+  }, [frete])
+
+  async function liberar() {
+    setLiberando(true)
+    await api('/api/transportadora', { method:'PATCH', body: JSON.stringify({ id: frete.id, status:'entregue' }) })
+    onEntregue && onEntregue()
+    setLiberando(false)
+  }
 
   const mins = Math.floor(segundos/60)
   const secs = segundos%60
+  const zerou = fase === 'entregue'
 
   return (
     <div>
-      <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'#7060a0', marginBottom:6 }}>
-        <span>{fase==='buscar'?'🚛 Indo buscar o gado...':'🐄 Gado indo para fazenda...'}</span>
-        <span style={{ color:'#a080ff', fontWeight:600 }}>{mins}:{String(secs).padStart(2,'0')}</span>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:12, color:'#7060a0', marginBottom:6 }}>
+        <span>{zerou ? '✅ Entregue — libere o caminhão' : fase==='buscar'?'🚛 Indo buscar o gado...':'🐄 Gado indo para fazenda...'}</span>
+        {zerou ? (
+          <button onClick={liberar} disabled={liberando} style={{ padding:'4px 12px', background:'linear-gradient(135deg,#1a4a10,#2a7a18)', color:'#fff', border:'none', borderRadius:6, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            {liberando ? '...' : '✓ Liberar caminhão'}
+          </button>
+        ) : (
+          <span style={{ color:'#a080ff', fontWeight:600 }}>{mins}:{String(secs).padStart(2,'0')}</span>
+        )}
       </div>
       <div style={{ background:'rgba(255,255,255,.05)', borderRadius:4, height:6, overflow:'hidden' }}>
-        <div style={{ width:`${pct}%`, height:'100%', background:'linear-gradient(90deg,#4060d0,#8040c0)', borderRadius:4, transition:'width 1s linear' }}/>
+        <div style={{ width:`${pct}%`, height:'100%', background: zerou?'linear-gradient(90deg,#2a7a18,#4ad4a0)':'linear-gradient(90deg,#4060d0,#8040c0)', borderRadius:4, transition:'width 1s linear' }}/>
       </div>
     </div>
   )
