@@ -1223,7 +1223,26 @@ export default function App() {
               <Card T={T} hover={false}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:T.text,marginBottom:16}}>Editar perfil</div>
                 <div style={{display:'flex',flexDirection:'column',gap:14,marginBottom:18}}>
-                  <Inp T={T} label="URL da foto de perfil" value={editPerfil.foto_url} onChange={e=>setEditPerfil(f=>({...f,foto_url:e.target.value}))} placeholder="https://i.imgur.com/..." hint="Cole o link direto da imagem"/>
+                  <div>
+                    <label style={{fontSize:11,color:T.textMuted,fontWeight:600,textTransform:'uppercase',letterSpacing:'.6px',display:'block',marginBottom:6}}>Foto de perfil</label>
+                    <div style={{display:'flex',gap:8,marginBottom:8,alignItems:'center'}}>
+                      <div style={{width:48,height:48,borderRadius:'50%',overflow:'hidden',background:T.inputBg,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>
+                        {editPerfil.foto_url?<img src={editPerfil.foto_url} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>:'🐄'}
+                      </div>
+                      <div style={{flex:1}}>
+                        <input type="file" accept="image/*" onChange={e=>{
+                          const file=e.target.files[0];if(!file)return;
+                          const reader=new FileReader();
+                          reader.onload=ev=>setEditPerfil(f=>({...f,foto_url:ev.target.result}));
+                          reader.readAsDataURL(file);
+                        }} style={{display:'none'}} id="foto-upload"/>
+                        <label htmlFor="foto-upload" style={{display:'block',padding:'7px 12px',background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:8,fontSize:12,color:T.textDim,cursor:'pointer',marginBottom:6,textAlign:'center'}}>
+                          📷 Escolher imagem
+                        </label>
+                        <input value={editPerfil.foto_url} onChange={e=>setEditPerfil(f=>({...f,foto_url:e.target.value}))} placeholder="ou cole uma URL..." style={{width:'100%',background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:8,padding:'6px 10px',fontSize:12,color:T.text,fontFamily:'inherit',outline:'none'}}/>
+                      </div>
+                    </div>
+                  </div>
                   <Inp T={T} label="Fazenda" value={editPerfil.fazenda} onChange={e=>setEditPerfil(f=>({...f,fazenda:e.target.value}))} placeholder="0325"/>
                   <Inp T={T} label="Bio" value={editPerfil.bio} onChange={e=>setEditPerfil(f=>({...f,bio:e.target.value}))} placeholder="Criador desde 2024..."/>
                   <Inp T={T} label="Nova senha" type="password" value={editPerfil.nova_senha} onChange={e=>setEditPerfil(f=>({...f,nova_senha:e.target.value}))} placeholder="Deixe em branco para manter"/>
