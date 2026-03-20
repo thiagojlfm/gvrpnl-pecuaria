@@ -496,6 +496,7 @@ export default function App() {
   const [notifType, setNotifType] = useState('success')
   const [chatAnuncio, setChatAnuncio] = useState(null)
   const [compraQt, setCompraQt] = useState(1)
+  const [faseAberta, setFaseAberta] = useState(null)
   const [compraComp, setCompraComp] = useState('')
   const [compraStep, setCompraStep] = useState(1)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -819,33 +820,88 @@ export default function App() {
                     </div>
                   </div>
                   {cot&&<>
-                    <div style={{background:T.inputBg,borderRadius:12,padding:18,marginBottom:16,border:`1px solid ${T.border}`}}>
-                      <div style={{fontSize:11,color:T.textMuted,marginBottom:12,fontWeight:600,textTransform:'uppercase',letterSpacing:'.6px'}}>Breakdown</div>
-                      {[[`${cot.qty}× Bezerro ($${fmt(mercado.precos.bezerro)}/cab)`,cot.custoBezerros],[`Frete ($${mercado.precos.frete}/cab)`,cot.custoFrete],[`Ração bezerro (21kg × $${mercado.precos.precoRacao})`,cot.custoRacaoBezerro],[`Ração garrote (35kg × $${mercado.precos.precoRacao})`,cot.custoRacaoGarrote],[`Ração boi (56kg × $${mercado.precos.precoRacao})`,cot.custoRacaoBoi]].map(([l,v])=>(
-                        <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:10,color:T.textDim,paddingBottom:10,borderBottom:`1px solid ${T.border}`}}>
-                          <span>{l}</span><span style={{fontWeight:500}}>${fmt(v)}</span>
+                    {/* Accordion por fase */}
+                    <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
+                      {[
+                        {
+                          id:'cria', icon:'🐄', label:'Fase 1 — Cria', sub:'Bezerro → Garrote · 1 semana',
+                          custo: cot.custoBezerros + cot.custoFrete + cot.custoRacaoBezerro + cot.custoRacaoGarrote,
+                          receita: cot.receitaGarrote, margem: cot.margemGarrote,
+                          itens:[
+                            [`${cot.qty}× Bezerro`, cot.custoBezerros],
+                            ['Frete entrada', cot.custoFrete],
+                            [`Ração bezerro (21kg × $${mercado.precos.precoRacao})`, cot.custoRacaoBezerro],
+                            [`Ração garrote (35kg × $${mercado.precos.precoRacao})`, cot.custoRacaoGarrote],
+                          ]
+                        },
+                        {
+                          id:'recria', icon:'🐂', label:'Fase 2 — Recria', sub:'Garrote → Boi · +1 semana',
+                          custo: cot.custoBezerros + cot.custoFrete + cot.custoRacaoBezerro + cot.custoRacaoGarrote + cot.custoRacaoBoi,
+                          receita: cot.receitaBoi, margem: cot.margemBoi,
+                          itens:[
+                            ['Custos anteriores (cria)', cot.custoBezerros + cot.custoFrete + cot.custoRacaoBezerro + cot.custoRacaoGarrote],
+                            [`Ração boi (56kg × $${mercado.precos.precoRacao})`, cot.custoRacaoBoi],
+                          ]
+                        },
+                        {
+                          id:'terminacao', icon:'🥩', label:'Fase 3 — Terminação', sub:'Boi → Abate · +1 semana',
+                          custo: cot.total,
+                          receita: cot.receita, margem: cot.margem,
+                          itens:[
+                            ['Todos os custos anteriores', cot.total],
+                          ]
+                        },
+                      ].map(fase => (
+                        <div key={fase.id} style={{border:`1px solid ${faseAberta===fase.id?'#4a6a28':T.border}`,borderRadius:12,overflow:'hidden',transition:'all .2s'}}>
+                          <button onClick={()=>setFaseAberta(faseAberta===fase.id?null:fase.id)}
+                            style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'12px 14px',background:faseAberta===fase.id?'rgba(42,74,20,.3)':T.inputBg,border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                            <span style={{fontSize:20}}>{fase.icon}</span>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:13,fontWeight:600,color:T.text}}>{fase.label}</div>
+                              <div style={{fontSize:11,color:T.textMuted}}>{fase.sub}</div>
+                            </div>
+                            <div style={{textAlign:'right'}}>
+                              <div style={{fontSize:14,fontWeight:800,color:'#c8a84a',fontFamily:"'Playfair Display',serif"}}>${fmt(fase.receita)}</div>
+                              <div style={{fontSize:11,fontWeight:600,color:fase.margem>0?'#4ad4a0':'#e06060'}}>{fase.margem}% margem</div>
+                            </div>
+                            <span style={{color:T.textMuted,fontSize:14,marginLeft:4}}>{faseAberta===fase.id?'▲':'▼'}</span>
+                          </button>
+                          {faseAberta===fase.id&&(
+                            <div style={{padding:'0 14px 14px',background:'rgba(10,18,8,.4)'}}>
+                              <div style={{height:1,background:T.border,marginBottom:12}}/>
+                              {fase.itens.map(([l,v])=>(
+                                <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:12,color:T.textMuted,marginBottom:6}}>
+                                  <span>{l}</span>
+                                  <span style={{color:T.text,fontWeight:600}}>${fmt(v)}</span>
+                                </div>
+                              ))}
+                              <div style={{height:1,background:T.border,margin:'10px 0'}}/>
+                              <div style={{display:'flex',justifyContent:'space-between',fontSize:13,fontWeight:700,marginBottom:12}}>
+                                <span style={{color:T.textMuted}}>Custo total desta fase</span>
+                                <span style={{color:T.text}}>${fmt(fase.custo)}</span>
+                              </div>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
+                                <div style={{background:T.inputBg,borderRadius:8,padding:'8px 10px',textAlign:'center',border:`1px solid ${T.border}`}}>
+                                  <div style={{fontSize:10,color:T.textMuted,marginBottom:2}}>Receita</div>
+                                  <div style={{fontSize:15,fontWeight:800,color:'#c8a84a',fontFamily:"'Playfair Display',serif"}}>${fmt(fase.receita)}</div>
+                                </div>
+                                <div style={{background:T.inputBg,borderRadius:8,padding:'8px 10px',textAlign:'center',border:`1px solid ${T.border}`}}>
+                                  <div style={{fontSize:10,color:T.textMuted,marginBottom:2}}>Lucro est.</div>
+                                  <div style={{fontSize:15,fontWeight:800,color:fase.margem>0?'#4ad4a0':'#e06060',fontFamily:"'Playfair Display',serif"}}>${fmt(fase.receita-fase.custo)}</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
-                      <div style={{display:'flex',justifyContent:'space-between',fontSize:18,fontWeight:700,fontFamily:"'Playfair Display',serif"}}>
-                        <span style={{color:T.text}}>Total</span><span style={{color:T.gold}}>${fmt(cot.total)}</span>
-                      </div>
                     </div>
-                    <div style={gs(110)}>
-                      <Metric T={T} icon="💵" label="Receita est." value={`$${fmt(cot.receita)}`} color={T.gold}/>
-                      <Metric T={T} icon="📊" label="Margem est." value={`${cot.margem}%`} color={Number(cot.margem)>20?T.green:Number(cot.margem)>10?T.amber:T.red}/>
+                    <Btn T={T} onClick={()=>setCompraStep(2)} style={{width:'100%',padding:14,fontSize:15}}>
+                      Tenho interesse — ${fmt(cot.custoBezerros+cot.custoFrete)} agora
+                    </Btn>
+                    <div style={{fontSize:11,color:T.textMuted,textAlign:'center',marginTop:8}}>
+                      Você paga apenas bezerros + frete agora. Ração por fase à medida que avançar.
                     </div>
-                    <Btn onClick={()=>setCompraStep(2)} T={T} style={{width:'100%',padding:13,fontSize:14,marginTop:16}}>Tenho interesse — ${fmt(cot.total)}</Btn>
                   </>}
-                </>}
-                {compraStep===2&&cot&&<>
-                  <Alrt type="info">Pague <strong>${fmt(cot.total)}</strong> no servidor e cole o comprovante abaixo.</Alrt>
-                  <div style={{background:T.inputBg,borderRadius:12,padding:14,marginBottom:16,border:`1px solid ${T.border}`}}>
-                    <div style={{display:'flex',justifyContent:'space-between',fontSize:14,marginBottom:6}}><span style={{color:T.textMuted}}>Total</span><span style={{fontWeight:700,color:T.gold,fontFamily:"'Playfair Display',serif"}}>${fmt(cot.total)}</span></div>
-                    <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}><span style={{color:T.textMuted}}>Margem est.</span><span style={{fontWeight:600,color:T.green}}>{cot.margem}%</span></div>
-                  </div>
-                  <div style={{marginBottom:16}}><Inp T={T} label="Link do comprovante (Discord)" value={compraComp} onChange={e=>setCompraComp(e.target.value)} placeholder="https://discord.com/channels/..."/></div>
-                  <div style={{display:'flex',gap:10}}>
-                    <Btn v="ghost" onClick={()=>setCompraStep(1)} T={T} style={{flex:1}}>Voltar</Btn>
                     <Btn onClick={async()=>{if(!compraComp) return notify('Cole o comprovante!','danger');const r=await api('/api/solicitacoes',{method:'POST',body:JSON.stringify({quantidade:compraQt,valor_total:cot.total,custo_racao:cot.custoRacao,comprovante:compraComp})});if(!r.error){setCompraStep(3);sounds.coin();api('/api/solicitacoes').then(setSolic)}}} T={T} style={{flex:2,padding:12}}>Enviar solicitação</Btn>
                   </div>
                 </>}
@@ -1513,3 +1569,4 @@ export default function App() {
     </div>
   </>
 }
+            </div>
