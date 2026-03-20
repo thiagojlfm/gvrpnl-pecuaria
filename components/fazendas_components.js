@@ -358,6 +358,53 @@ export function FazendasPage({ T, user, api, notify, users }) {
 }
 
 // ─── Minha Fazenda Page ───────────────────────────────────────────────────────
+// ─── Aluguel Pasto NPC ────────────────────────────────────────────────────────
+function AluguelPastoNPC({ T, user, api, notify, fazenda }) {
+  const [opcoes, setOpcoes] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    api('/api/npc?tipo=pasto').then(setOpcoes)
+  }, [api])
+
+  async function alugar(op) {
+    setLoading(true)
+    const r = await api('/api/npc', {
+      method: 'POST',
+      body: JSON.stringify({ action:'alugar_pasto', fazenda_id: fazenda?.id, ha: op.ha })
+    })
+    setLoading(false)
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    notify(`✓ ${op.ha}ha de pasto alugado por 7 dias!`)
+  }
+
+  if (!opcoes) return null
+
+  return (
+    <div style={{ background:'rgba(42,10,10,.4)', border:'1px solid #6a1818', borderRadius:14, padding:18, marginBottom:16 }}>
+      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:'#e06060', marginBottom:6 }}>
+        🌿 Alugar pasto extra — NPC
+      </div>
+      <p style={{ fontSize:12, color:T.textMuted, marginBottom:14, lineHeight:1.6 }}>
+        Sua fazenda está superlotada. Alugue pasto adicional do NPC por 1 semana para acomodar o rebanho enquanto aguarda os animais avançarem de fase.
+      </p>
+      <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+        {opcoes.opcoes.map(op => (
+          <button key={op.ha} onClick={() => alugar(op)} disabled={loading}
+            style={{ flex:1, minWidth:100, padding:'10px 8px', background:'rgba(10,42,10,.6)', border:'1px solid #2a5a12', borderRadius:10, color:'#4ad4a0', cursor:'pointer', fontFamily:'inherit', textAlign:'center' }}>
+            <div style={{ fontSize:13, fontWeight:700 }}>{op.ha} ha</div>
+            <div style={{ fontSize:11, color:T.textMuted, margin:'2px 0' }}>7 dias</div>
+            <div style={{ fontSize:14, fontWeight:800, fontFamily:"'Playfair Display',serif" }}>${(op.valor).toLocaleString('pt-BR')}</div>
+          </button>
+        ))}
+      </div>
+      <div style={{ fontSize:11, color:T.textMuted, marginTop:10 }}>
+        ${opcoes.preco_por_ha}/ha por semana · Pague no servidor e registre no admin
+      </div>
+    </div>
+  )
+}
+
 export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
   const [fazendas, setFazendas] = useState([])
   const [selectedFaz, setSelectedFaz] = useState(null)
@@ -543,6 +590,11 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
                 })}
               </div>
             </div>
+          )}
+
+          {/* Aluguel de pasto NPC */}
+          {cap?.lotada && (
+            <AluguelPastoNPC T={T} user={user} api={api} notify={notify} fazenda={selectedFaz}/>
           )}
 
           {/* Serviços/Custos */}
@@ -2069,5 +2121,308 @@ function FreteRacaoSection({ T, user, api, notify, sounds }) {
         ))}
       </div>
     </div>
+  )
+}
+
+// ─── Fretes NPC Section ───────────────────────────────────────────────────────
+export function FretesNPCPage({ T, user, api, notify, sounds }) {
+  const [fretes, setFretes] = useState([])
+  const [meusFretes, setMeusFretes] = useState([])
+  const [caminhoes, setCaminhoes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [aceitando, setAceitando] = useState(null)
+  const [camSel, setCamSel] = useState('')
+  const [tab, setTab] = useState('disponivel')
+
+  const load = useCallback(async () => {
+    if (!user) return
+    setLoading(true)
+    const [f, mf, c] = await Promise.all([
+      api('/api/npc?tipo=fretes'),
+      api('/api/npc?tipo=meus_fretes'),
+      api('/api/transportadora?tipo=caminhoes'),
+    ])
+    setFretes(Array.isArray(f)?f:[])
+    setMeusFretes(Array.isArray(mf)?mf:[])
+    setCaminhoes(Array.isArray(c)?c:[])
+    setLoading(false)
+  }, [user, api])
+
+  useEffect(() => { load() }, [load])
+
+  async function aceitar() {
+    if (!camSel) return notify('Selecione um caminhão!', 'danger')
+    const r = await api('/api/npc', { method:'POST', body: JSON.stringify({ action:'aceitar_frete', frete_id: aceitando.id, caminhao_id: parseInt(camSel) }) })
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.success()
+    notify('✓ Frete NPC aceito! 45 minutos de rota.')
+    setAceitando(null)
+    load()
+  }
+
+  const caminhoesLivres = caminhoes.filter(c => c.status === 'disponivel')
+  const emRota = meusFretes.filter(f => f.status === 'em_rota')
+  const total = fretes.length
+
+  if (!user) return <div style={{textAlign:'center',padding:60,color:T.textMuted}}>Faça login para ver os fretes NPC.</div>
+
+  return (
+    <div>
+      <div style={{ marginBottom:28, paddingBottom:16, borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
+            <span style={{ fontSize:24 }}>🤖</span>
+            <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Fretes NPC</h1>
+          </div>
+          <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>12 cargas por dia — pagam 60% do valor normal. Resetam à meia-noite.</p>
+        </div>
+        <div style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', borderRadius:12, padding:'10px 16px', textAlign:'center' }}>
+          <div style={{ fontSize:10, color:'#7060a0', fontWeight:600, textTransform:'uppercase', letterSpacing:'1px', marginBottom:4 }}>Disponíveis hoje</div>
+          <div style={{ fontSize:24, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>{fretes.filter(f=>f.status==='disponivel').length}/12</div>
+        </div>
+      </div>
+
+      {/* Em rota agora */}
+      {emRota.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          {emRota.map(f => (
+            <div key={f.id} style={{ background:'#0a0818', border:'1px solid #3020a0', borderRadius:14, padding:18, marginBottom:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#a080ff' }}>{f.tipo_carga==='racao'?'🌾':'🚛'} NPC — {f.quantidade} {f.tipo_carga==='racao'?'kg':'cab.'}</div>
+                  <div style={{ fontSize:11, color:'#7060a0' }}>{f.origem} → {f.destino}</div>
+                </div>
+                <div style={{ fontSize:18, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
+              </div>
+              <FreteNPCTracker frete={f} T={T} api={api} onEntregue={() => { sounds?.coin(); notify(`✓ Frete NPC entregue! +$${fmt(f.valor)}`); load() }}/>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+        {[['disponivel','📦 Disponíveis'],['historico','📋 Histórico']].map(([v,l]) => (
+          <button key={v} onClick={()=>setTab(v)} style={{ padding:'7px 16px', borderRadius:20, border:`1px solid ${tab===v?'#5030c0':T.border}`, background:tab===v?'rgba(80,48,192,.2)':'transparent', color:tab===v?'#a080ff':T.textMuted, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:tab===v?600:400 }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'disponivel' && (
+        loading ? <div style={{textAlign:'center',padding:40,color:T.textMuted}}>Carregando...</div> :
+        fretes.filter(f=>f.status==='disponivel').length === 0 ? (
+          <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:48, textAlign:'center' }}>
+            <div style={{ fontSize:48, marginBottom:12 }}>🤖</div>
+            <div style={{ fontSize:16, color:T.textMuted }}>Nenhum frete NPC disponível agora</div>
+            <div style={{ fontSize:12, color:T.textMuted, marginTop:6 }}>Resetam toda meia-noite</div>
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {/* Info */}
+            <div style={{ background:'rgba(42,24,0,.4)', border:'1px solid #4a3010', borderRadius:12, padding:'12px 16px', fontSize:12, color:'#a08040', marginBottom:4 }}>
+              ⚠ Fretes NPC pagam <strong>60% do valor normal</strong> e duram <strong>45 minutos</strong>. Use quando não tiver frete de jogador disponível.
+            </div>
+            {fretes.filter(f=>f.status==='disponivel').map(f => (
+              <div key={f.id} style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:18, display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+                <div style={{ fontSize:28 }}>{f.tipo_carga==='racao'?'🌾':'🐄'}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>
+                    {f.quantidade} {f.tipo_carga==='racao'?'kg de ração':'cabeças de gado'}
+                  </div>
+                  <div style={{ fontSize:12, color:T.textMuted, marginTop:2 }}>{f.origem} → {f.destino}</div>
+                  <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>⏱ 45 min · NPC</div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
+                  <div style={{ fontSize:10, color:'#6a5030', marginTop:2 }}>60% do normal</div>
+                </div>
+                <button onClick={() => { setAceitando(f); setCamSel(caminhoesLivres[0]?.id?.toString()||'') }} disabled={caminhoesLivres.length===0}
+                  style={{ padding:'9px 16px', background:caminhoesLivres.length>0?'linear-gradient(135deg,#3020a0,#6030c0)':'rgba(80,48,192,.2)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:caminhoesLivres.length>0?'pointer':'not-allowed', fontFamily:'inherit', opacity:caminhoesLivres.length>0?1:.5 }}>
+                  {caminhoesLivres.length>0?'Aceitar':'Sem caminhão'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === 'historico' && (
+        <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:18 }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:T.text, marginBottom:14 }}>Histórico de fretes NPC</div>
+          {meusFretes.length===0 ? <div style={{textAlign:'center',padding:'20px 0',color:T.textMuted,fontSize:13}}>Nenhum frete NPC realizado ainda</div> : (
+            <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+              {meusFretes.map((f,i) => (
+                <div key={f.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:i<meusFretes.length-1?`1px solid ${T.border}`:'none', flexWrap:'wrap' }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{f.tipo_carga==='racao'?'🌾':'🐄'} {f.quantidade} {f.tipo_carga==='racao'?'kg':'cab.'}</div>
+                    <div style={{ fontSize:11, color:T.textMuted }}>{f.origem} → {f.destino} · {new Date(f.criado_em).toLocaleDateString('pt-BR')}</div>
+                  </div>
+                  <div style={{ fontWeight:700, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
+                  <span style={{ background:f.status==='entregue'?'rgba(10,42,10,.8)':'rgba(10,8,24,.8)', border:`1px solid ${f.status==='entregue'?'#2a5a12':'#3020a0'}`, color:f.status==='entregue'?'#4ad4a0':'#a080ff', fontSize:10, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>
+                    {f.status==='entregue'?'✓ Entregue':'🚛 Em rota'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal aceitar */}
+      {aceitando && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
+          <div style={{ background:T.card, border:'1px solid #3020a0', borderRadius:20, padding:32, width:'100%', maxWidth:400, boxShadow:'0 30px 80px rgba(0,0,0,.5)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+              <h3 style={{ fontFamily:"'Playfair Display',serif", fontSize:18, color:T.text }}>🤖 Aceitar Frete NPC</h3>
+              <button onClick={()=>setAceitando(null)} style={{ background:'none', border:'none', color:T.textMuted, fontSize:22, cursor:'pointer' }}>×</button>
+            </div>
+            <div style={{ background:T.inputBg, borderRadius:12, padding:16, marginBottom:16, border:`1px solid ${T.border}` }}>
+              {[
+                ['Carga', `${aceitando.quantidade} ${aceitando.tipo_carga==='racao'?'kg de ração':'cabeças'}`],
+                ['Rota', `${aceitando.origem} → ${aceitando.destino}`],
+                ['Duração', '45 minutos'],
+                ['Ganho', `$${fmt(aceitando.valor)}`],
+              ].map(([l,v]) => (
+                <div key={l} style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:8 }}>
+                  <span style={{ color:T.textMuted }}>{l}</span>
+                  <span style={{ fontWeight:l==='Ganho'?800:400, color:l==='Ganho'?'#a080ff':T.text, fontFamily:l==='Ganho'?"'Playfair Display',serif":'inherit' }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            {caminhoesLivres.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:8 }}>Selecionar caminhão</label>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {caminhoesLivres.map(c => {
+                    const insuf = aceitando.tipo_carga==='racao' ? (c.racao_cap||0)<aceitando.quantidade : c.capacidade<aceitando.quantidade
+                    return (
+                      <button key={c.id} onClick={()=>!insuf&&setCamSel(c.id.toString())} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', background:camSel===c.id.toString()?'rgba(80,48,192,.2)':T.inputBg, border:`1px solid ${insuf?'#6a1818':camSel===c.id.toString()?'#5030c0':T.border}`, borderRadius:8, cursor:insuf?'not-allowed':'pointer', fontFamily:'inherit', opacity:insuf?.5:1 }}>
+                        <span>🚛</span>
+                        <div style={{ flex:1, textAlign:'left' }}>
+                          <div style={{ fontSize:12, fontWeight:600, color:insuf?'#e06060':T.text }}>{c.modelo}</div>
+                          <div style={{ fontSize:10, color:T.textMuted }}>{insuf?'Insuficiente':'Disponível'} · {aceitando.tipo_carga==='racao'?`${fmt(c.racao_cap||0)}kg ração`:`${c.capacidade} cab.`}</div>
+                        </div>
+                        {camSel===c.id.toString()&&<span style={{color:'#a080ff'}}>✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={()=>setAceitando(null)} style={{ flex:1, padding:10, background:'transparent', border:`1px solid ${T.border2}`, color:T.textDim, borderRadius:10, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+              <button onClick={aceitar} disabled={!camSel} style={{ flex:2, padding:10, background:camSel?'linear-gradient(135deg,#3020a0,#6030c0)':'rgba(80,48,192,.2)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:camSel?'pointer':'not-allowed', fontFamily:'inherit' }}>
+                🤖 Aceitar — ${fmt(aceitando.valor)}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Mini tracker para frete NPC
+function FreteNPCTracker({ frete, T, api, onEntregue }) {
+  const [segundos, setSegundos] = useState(0)
+  const [pct, setPct] = useState(0)
+  const [liberando, setLiberando] = useState(false)
+  const [zerou, setZerou] = useState(false)
+
+  useEffect(() => {
+    if (!frete?.entrega_em) return
+    const update = () => {
+      const agora = Date.now()
+      const chegaEm = new Date(frete.entrega_em).getTime()
+      const inicio = new Date(frete.aceito_em).getTime()
+      const diff = Math.max(0, Math.ceil((chegaEm - agora) / 1000))
+      const elapsed = agora - inicio
+      const total = chegaEm - inicio
+      setPct(Math.min(100, (elapsed / total) * 100))
+      setSegundos(diff)
+      if (diff === 0) setZerou(true)
+    }
+    update()
+    const iv = setInterval(update, 1000)
+    return () => clearInterval(iv)
+  }, [frete])
+
+  async function liberar() {
+    setLiberando(true)
+    await api('/api/npc', { method:'POST', body: JSON.stringify({ action:'entregar_frete', frete_id: frete.id }) })
+    onEntregue && onEntregue()
+    setLiberando(false)
+  }
+
+  const mins = Math.floor(segundos/60)
+  const secs = segundos%60
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:12, color:'#7060a0', marginBottom:6 }}>
+        <span>{zerou ? '✅ Entregue — confirme!' : '🤖 NPC em rota...'}</span>
+        {zerou ? (
+          <button onClick={liberar} disabled={liberando} style={{ padding:'4px 12px', background:'linear-gradient(135deg,#1a4a10,#2a7a18)', color:'#fff', border:'none', borderRadius:6, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            {liberando?'...':'✓ Confirmar entrega'}
+          </button>
+        ) : (
+          <span style={{ color:'#a080ff', fontWeight:600 }}>{mins}:{String(secs).padStart(2,'0')}</span>
+        )}
+      </div>
+      <div style={{ background:'rgba(255,255,255,.05)', borderRadius:4, height:5, overflow:'hidden' }}>
+        <div style={{ width:`${pct}%`, height:'100%', background:zerou?'linear-gradient(90deg,#2a7a18,#4ad4a0)':'linear-gradient(90deg,#5040b0,#a080ff)', borderRadius:4, transition:'width 1s linear' }}/>
+      </div>
+    </div>
+  )
+}
+
+// ─── Oferta NPC em anúncio ────────────────────────────────────────────────────
+export function BotaoOfertaNPC({ anuncio, T, api, notify, sounds, onVendido }) {
+  const [oferta, setOferta] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
+
+  async function solicitar() {
+    setLoading(true)
+    const r = await api('/api/npc', { method:'POST', body: JSON.stringify({ action:'oferta_npc', anuncio_id: anuncio.id }) })
+    setLoading(false)
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    setOferta(r)
+  }
+
+  async function aceitar() {
+    setConfirmando(true)
+    const r = await api('/api/npc', { method:'POST', body: JSON.stringify({ action:'aceitar_oferta_npc', anuncio_id: anuncio.id, valor: oferta.oferta }) })
+    setConfirmando(false)
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.coin()
+    notify(`✓ Vendido ao NPC por $${oferta.oferta}! Aguarde addmoney do admin.`)
+    setOferta(null)
+    onVendido && onVendido()
+  }
+
+  if (oferta) return (
+    <div style={{ background:'rgba(10,42,10,.4)', border:'1px solid #2a5a12', borderRadius:10, padding:12, marginTop:8 }}>
+      <div style={{ fontSize:12, color:T.textMuted, marginBottom:6 }}>Oferta do Frigorífico NPC:</div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+        <div>
+          <div style={{ fontSize:16, fontWeight:800, color:'#4ad4a0', fontFamily:"'Playfair Display',serif" }}>${(oferta.oferta).toLocaleString('pt-BR')}</div>
+          <div style={{ fontSize:10, color:T.textMuted }}>{oferta.desconto_pct}% abaixo do mercado · {oferta.quantidade} cab.</div>
+        </div>
+        <div style={{ display:'flex', gap:6 }}>
+          <button onClick={() => setOferta(null)} style={{ padding:'6px 10px', background:'transparent', border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:8, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>Recusar</button>
+          <button onClick={aceitar} disabled={confirmando} style={{ padding:'6px 12px', background:'linear-gradient(135deg,#1a4a10,#2a7a18)', color:'#fff', border:'none', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            {confirmando?'...':'✓ Aceitar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <button onClick={solicitar} disabled={loading} style={{ padding:'6px 12px', background:'rgba(10,42,10,.3)', border:'1px solid #2a5a12', color:'#4ad4a0', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+      {loading ? '...' : '🤖 Pedir oferta NPC'}
+    </button>
   )
 }
