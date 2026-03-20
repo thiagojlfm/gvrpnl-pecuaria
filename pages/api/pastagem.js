@@ -3,12 +3,12 @@ import { verifyToken, getTokenFromReq } from '../../lib/auth'
 
 // 6 campos de pasto NPC com tamanhos e preços variados
 const CAMPOS_PASTO = [
-  { id:1, nome:'Campo Verde Norte', regiao:'Green Hills Norte', ha:20, preco_semana:21000, foto_url:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80', disponivel:true },
-  { id:2, nome:'Pastagem Rio Claro', regiao:'Green Hills Sul', ha:35, preco_semana:34800, foto_url:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80', disponivel:true },
-  { id:3, nome:'Campo Dourado Oeste', regiao:'Lake Ville', ha:50, preco_semana:45000, foto_url:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80', disponivel:true },
-  { id:4, nome:'Pasto Serra Alta', regiao:'Green Hills Talhões', ha:25, preco_semana:25200, foto_url:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80', disponivel:true },
-  { id:5, nome:'Retiro Bela Vista', regiao:'Lake Ville Talhões', ha:40, preco_semana:37200, foto_url:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80', disponivel:true },
-  { id:6, nome:'Campo Novo Horizonte', regiao:'Green Hills', ha:70, preco_semana:63000, foto_url:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80', disponivel:true },
+  { id:1, nome:'Campo Verde Norte', regiao:'Green Hills Norte', ha:20, preco_semana:10500, foto_url:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80', disponivel:true },
+  { id:2, nome:'Pastagem Rio Claro', regiao:'Green Hills Sul', ha:35, preco_semana:17400, foto_url:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80', disponivel:true },
+  { id:3, nome:'Campo Dourado Oeste', regiao:'Lake Ville', ha:50, preco_semana:22500, foto_url:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80', disponivel:true },
+  { id:4, nome:'Pasto Serra Alta', regiao:'Green Hills Talhões', ha:25, preco_semana:12600, foto_url:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80', disponivel:true },
+  { id:5, nome:'Retiro Bela Vista', regiao:'Lake Ville Talhões', ha:40, preco_semana:18600, foto_url:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80', disponivel:true },
+  { id:6, nome:'Campo Novo Horizonte', regiao:'Green Hills', ha:70, preco_semana:31500, foto_url:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80', disponivel:true },
 ]
 
 const CAP_POR_HA = { bezerro:3, garrote:2, boi:1 }
@@ -97,6 +97,46 @@ export default async function handler(req, res) {
        `${campo.nome} — ${campo.ha}ha por 7 dias. Pague $${campo.preco_semana} ao admin.`])
 
     return res.json(data)
+  }
+
+  if (req.method === 'PATCH') {
+    // Admin associa/desassocia jogador a campo + disponível/indisponível
+    if (user.role !== 'admin') return res.status(403).json({ error: 'Sem permissão' })
+    const { campo_id, action, jogador_id, jogador_nome, disponivel } = req.body
+
+    if (action === 'associar') {
+      // Encerra aluguel anterior se existir
+      await query(`UPDATE alugueis_pasto SET status='encerrado' WHERE campo_id=$1 AND status='ativo'`, [campo_id])
+      // Cria novo aluguel associado pelo admin (sem validade, admin controla)
+      const validoAte = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 dias default
+      const campo = CAMPOS_PASTO.find(c => c.id === parseInt(campo_id))
+      await queryOne(
+        `INSERT INTO alugueis_pasto (jogador_id, jogador_nome, campo_id, campo_nome, ha_alugado, valor_pago, valido_ate, status)
+         VALUES ($1,$2,$3,$4,$5,0,$6,'ativo')`,
+        [jogador_id, jogador_nome, campo_id, campo?.nome, campo?.ha, validoAte.toISOString()]
+      )
+      await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+        [jogador_id, '🌿 Pasto associado!', `O admin associou o ${campo?.nome} à sua conta. Agora aparece em Fazendas!`])
+      return res.json({ ok: true })
+    }
+
+    if (action === 'desassociar') {
+      await query(`UPDATE alugueis_pasto SET status='encerrado' WHERE campo_id=$1 AND status='ativo'`, [campo_id])
+      return res.json({ ok: true })
+    }
+
+    if (action === 'disponibilidade') {
+      // Marca campo como disponível ou indisponível (sem aluguel)
+      await query(`CREATE TABLE IF NOT EXISTS campos_status (campo_id INTEGER PRIMARY KEY, disponivel BOOLEAN DEFAULT true)`, [])
+      await query(
+        `INSERT INTO campos_status (campo_id, disponivel) VALUES ($1,$2)
+         ON CONFLICT (campo_id) DO UPDATE SET disponivel=$2`,
+        [campo_id, disponivel]
+      )
+      return res.json({ ok: true })
+    }
+
+    return res.status(400).json({ error: 'Ação inválida' })
   }
 
   if (req.method === 'DELETE') {

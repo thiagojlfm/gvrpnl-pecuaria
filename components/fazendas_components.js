@@ -2438,10 +2438,13 @@ export function PastagemPage({ T, user, api, notify, sounds }) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const r = await fetch('/api/pastagem').then(r=>r.json())
-    setDados(r)
+    const [r, jogadores] = await Promise.all([
+      fetch('/api/pastagem').then(r=>r.json()),
+      user?.role==='admin' ? api('/api/admin/usuarios').catch(()=>[]) : Promise.resolve([])
+    ])
+    setDados({ ...r, jogadores: Array.isArray(jogadores) ? jogadores.filter(u=>u.role==='jogador'&&u.status==='aprovado') : [] })
     setLoading(false)
-  }, [])
+  }, [user, api])
 
   useEffect(() => { load() }, [load])
 
@@ -2531,12 +2534,40 @@ export function PastagemPage({ T, user, api, notify, sounds }) {
                     <div style={{ fontSize:20, fontWeight:800, color:'#6ab840', fontFamily:"'Playfair Display',serif" }}>${fmt(c.preco_semana)}</div>
                     <div style={{ fontSize:10, color:T.textMuted }}>por semana</div>
                   </div>
-                  {c.meu ? (
+                  {user?.role === 'admin' ? (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      <select onChange={async e => {
+                        if (!e.target.value) return
+                        await api('/api/pastagem', { method:'PATCH', body: JSON.stringify({
+                          action:'associar', campo_id: c.id,
+                          jogador_id: e.target.value,
+                          jogador_nome: e.target.options[e.target.selectedIndex].text
+                        })})
+                        notify(`✓ Campo associado!`)
+                        load()
+                        e.target.value = ''
+                      }} style={{ fontSize:11, padding:'5px 8px', background:T.inputBg, border:`1px solid ${T.border}`, borderRadius:8, color:T.text, cursor:'pointer', fontFamily:'inherit' }}>
+                        <option value="">Associar jogador...</option>
+                        {(dados?.jogadores||[]).map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                      </select>
+                      {c.ocupado && (
+                        <button onClick={async () => {
+                          await api('/api/pastagem', { method:'PATCH', body: JSON.stringify({ action:'desassociar', campo_id: c.id }) })
+                          notify('Campo liberado!')
+                          load()
+                        }} style={{ padding:'4px 10px', background:'rgba(100,20,20,.4)', border:'1px solid #6a1818', color:'#e06060', borderRadius:8, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                          Desassociar
+                        </button>
+                      )}
+                    </div>
+                  ) : c.meu ? (
                     <div style={{ fontSize:12, color:'#4ad4a0', fontWeight:600 }}>
                       Válido até {new Date(meuCampo?.valido_ate).toLocaleDateString('pt-BR')}
                     </div>
                   ) : c.ocupado ? (
-                    <div style={{ fontSize:12, color:T.textMuted, fontStyle:'italic' }}>Indisponível</div>
+                    <div style={{ fontSize:12, color:T.textMuted, fontStyle:'italic' }}>
+                      {c.inquilino ? `🔒 ${c.inquilino}` : 'Indisponível'}
+                    </div>
                   ) : (
                     <button onClick={() => setAlugando(c)}
                       style={{ padding:'8px 16px', background:'linear-gradient(135deg,#1a4a10,#3a7a20)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
