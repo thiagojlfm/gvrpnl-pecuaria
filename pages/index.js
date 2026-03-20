@@ -1,4 +1,4 @@
-import { FazendasPage, MinhaFazendaPage, CeleiroPage, TransportadoraPage, ConcessionariaPage } from '../components/fazendas_components'
+import { FazendasPage, MinhaFazendaPage, CeleiroPage, TransportadoraPage, ConcessionariaPage, FretesNPCPage, BotaoOfertaNPC } from '../components/fazendas_components'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Head from 'next/head'
 
@@ -408,6 +408,7 @@ const NAV_ITEMS = [
   {id:'minha_fazenda',icon:'🌾',label:'Minha Fazenda',pub:false},
   {id:'celeiro',icon:'🏚',label:'Celeiro',pub:false},
   {id:'transportadora',icon:'🚛',label:'Transportadora',pub:false},
+  {id:'fretes_npc',icon:'🤖',label:'Fretes NPC',pub:false},
   {id:'concessionaria',icon:'🏢',label:'Concessionária',pub:false},
   {id:'ranking',icon:'🏆',label:'Ranking',pub:true},
   {id:'ajuda',icon:'❓',label:'Ajuda',pub:true},
@@ -1438,6 +1439,7 @@ export default function App() {
           {page==='minha_fazenda'&&<MinhaFazendaPage T={T} user={user} api={api} notify={notify} lotes={lotes} mercado={mercado}/>}
           {page==='celeiro'&&<CeleiroPage T={T} user={user} api={api} notify={notify} mercado={mercado} sounds={sounds}/>}
           {page==='transportadora'&&<TransportadoraPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}
+          {page==='fretes_npc'&&<FretesNPCPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}
           {page==='concessionaria'&&<ConcessionariaPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}
 
           {page==='hist'&&user?.role!=='admin'&&<Alrt type="danger">Acesso restrito — apenas administradores.</Alrt>}

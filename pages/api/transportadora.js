@@ -62,6 +62,17 @@ export default async function handler(req, res) {
       return res.json(data || [])
     }
 
+    // Get all available vans for admin assignment
+    if (tipo === 'vans_disponiveis' && user?.role === 'admin') {
+      const { data } = await query(
+        `SELECT c.*, u.username as dono FROM caminhoes c
+         LEFT JOIN usuarios u ON c.jogador_id = u.id
+         WHERE c.status = 'disponivel' AND (c.tipo = 'racao' OR c.racao_cap > 0)
+         ORDER BY c.tipo DESC, c.racao_cap DESC`, []
+      )
+      return res.json(data || [])
+    }
+
     // Stats do transportador
     if (tipo === 'stats') {
       if (!user) return res.status(401).json({ error: 'Não autorizado' })
@@ -100,8 +111,9 @@ export default async function handler(req, res) {
     // Verificar compatibilidade tipo carga
     const tipoFrete = frete.tipo_carga || 'gado'
     const tipoCaminhao = caminhao.tipo || 'gado'
-    if (tipoFrete === 'racao' && tipoCaminhao === 'gado' && caminhao.racao_cap <= 0) {
-      return res.status(400).json({ error: 'Este caminhão não transporta ração!' })
+    // Van só transporta ração. Trucks boiadeiros com racao_cap > 0 transportam ambos.
+    if (tipoFrete === 'racao' && (caminhao.racao_cap||0) === 0) {
+      return res.status(400).json({ error: 'Este caminhão não tem capacidade para ração!' })
     }
     if (tipoFrete === 'gado' && tipoCaminhao === 'racao') {
       return res.status(400).json({ error: 'Van de ração não transporta gado!' })
@@ -195,11 +207,40 @@ export default async function handler(req, res) {
         `UPDATE fretes_transportadora SET status=$1 WHERE id=$2 RETURNING *`, [status, id]
       )
       // Fluxo ração manual: liberado → retirado → entregue
-      // 'liberado' — admin libera carga no armazém
+      // 'atribuir' — admin atribui van e libera bloco
+      if (status === 'atribuir') {
+        const { transportador_id, transportador_nome, caminhao_id } = req.body
+        if (!transportador_id) return res.status(400).json({ error: 'Selecione um transportador' })
+
+        // Check van capacity
+        const { data: van } = await queryOne(`SELECT * FROM caminhoes WHERE id=$1`, [caminhao_id])
+        if (van && van.racao_cap < frete.quantidade) {
+          return res.status(400).json({ error: `Van comporta ${van.racao_cap}kg mas bloco tem ${frete.quantidade}kg` })
+        }
+
+        await queryOne(
+          `UPDATE fretes_transportadora SET status='liberado', transportador_id=$1, transportador_nome=$2, caminhao_id=$3 WHERE id=$4`,
+          [transportador_id, transportador_nome, caminhao_id||null, id]
+        )
+        // Mark van as busy
+        if (caminhao_id) await query(`UPDATE caminhoes SET status='em_rota' WHERE id=$1`, [caminhao_id])
+
+        await query(
+          `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+          [transportador_id,
+           '🌾 Carga liberada no armazém!',
+           `Frete ${frete.lote_codigo} — ${frete.quantidade}kg prontos para retirada. Vá ao armazém no jogo e clique em "Retirei".`]
+        )
+        await query(`INSERT INTO admin_log (admin_nome, acao, detalhes) VALUES ($1,$2,$3)`,
+          [user.username, 'Bloco ração atribuído', `${frete.lote_codigo} bloco ${frete.bloco_num} → ${transportador_nome}`])
+        return res.json({ ok: true })
+      }
+
+      // 'liberado' — notificação já feita no atribuir
       if (status === 'liberado') {
         await query(
           `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
-          [frete.transportador_id || frete.comprador_id,
+          [frete.transportador_id,
            '🌾 Carga liberada no armazém!',
            `Frete ${frete.lote_codigo} — ${frete.quantidade}kg prontos para retirada. Vá ao armazém no jogo e clique em "Retirei".`]
         )
