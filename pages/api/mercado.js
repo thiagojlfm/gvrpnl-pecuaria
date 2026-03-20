@@ -2,7 +2,7 @@ import { query } from '../../lib/db'
 
 export default async function handler(req, res) {
   const { data: lotes } = await query(
-    `SELECT fase, quantidade, status FROM lotes WHERE status IN ('ativo','aguardando_pagamento','em_transito')`, []
+    `SELECT fase, quantidade FROM lotes WHERE status IN ('ativo','aguardando_pagamento','em_transito')`, []
   )
 
   const rebanho = { bezerro:0, garrote:0, boi:0, total:0 }
@@ -13,37 +13,33 @@ export default async function handler(req, res) {
     }
   })
 
-  // Ratio: 0 = vazio, 1 = cheio (base 400 cab)
-  const ideal = 400
-  const ratio = Math.min(rebanho.total / ideal, 1)
+  // ratio: 0 = vazio, 1 = cheio (base 400 cab)
+  const ratio = Math.min(rebanho.total / 400, 1)
 
-  // Preço por kg por fase — cai conforme rebanho aumenta (oferta sobe)
-  // Vazio → Cheio
-  // Garrote: $2.73 → $2.20  (margem cai de ~18% para ~12%)
-  // Boi:     $2.49 → $2.05  (margem cai de ~25% para ~20%)
-  // Abate:   $2.55 → $2.05  (margem cai de ~35% para ~27%)
-  const precoKgGarrote = Number((2.73 - ratio * 0.53).toFixed(2))
-  const precoKgBoi     = Number((2.49 - ratio * 0.44).toFixed(2))
-  const precoKgAbate   = Number((2.55 - ratio * 0.50).toFixed(2))
+  // precoKg por fase — varia apenas 5% entre vazio e cheio
+  // Mínimo (cheio) garante margem mínima mesmo com ração cara
+  const precoKgGarrote = Number((2.65 + (1 - ratio) * 0.13).toFixed(2)) // 2.65 → 2.78
+  const precoKgBoi     = Number((2.43 + (1 - ratio) * 0.12).toFixed(2)) // 2.43 → 2.55
+  const precoKgAbate   = Number((2.66 + (1 - ratio) * 0.13).toFixed(2)) // 2.66 → 2.79
 
-  // Ração: sobe com demanda
+  // Ração sobe com demanda
   let precoRacao = 2.00
   if (rebanho.total > 600) precoRacao = 3.00
   else if (rebanho.total > 400) precoRacao = 2.40
 
-  const racaoPorCabeca = 112 // total ciclo completo
-  const custoRacao = racaoPorCabeca * precoRacao
+  // Custos acumulados por fase
+  const custoAteGarrote = 800 + 50 + Math.round(21 * precoRacao * 100) / 100
+  const custoAteBoi     = custoAteGarrote + Math.round(35 * precoRacao * 100) / 100
+  const custoAteAbate   = custoAteBoi + Math.round(56 * precoRacao * 100) / 100
 
   const precos = {
-    // Preço por kg de cada fase
     precoKgGarrote,
     precoKgBoi,
     precoKgAbate,
     precoKg: precoKgAbate, // compat
     precoRacao,
-    racaoPorCabeca,
-    custoRacao,
-    // Preço por cabeça
+    racaoPorCabeca: 112,
+    custoRacao: Math.round(112 * precoRacao * 100) / 100,
     bezerro: 800,
     garrote: Math.round(400 * precoKgGarrote),
     boi:     Math.round(540 * precoKgBoi),
@@ -54,16 +50,10 @@ export default async function handler(req, res) {
     racaoDiariaBoi: 8,
   }
 
-  // Margem estimada ciclo completo (bezerro → abate)
-  const custoTotal = precos.bezerro + precos.frete + custoRacao
-  const margem = Number(((precos.abate - custoTotal) / precos.abate * 100).toFixed(1))
-
-  // Margens por fase para exibir no mercado
-  const custoAteGarrote = 800 + 50 + (21 * precoRacao) + (35 * precoRacao)
-  const custoAteBoi = custoAteGarrote + (56 * precoRacao)
+  // Margens por fase
   const margemGarrote = Number(((precos.garrote - custoAteGarrote) / precos.garrote * 100).toFixed(1))
-  const margemBoi = Number(((precos.boi - custoAteBoi) / precos.boi * 100).toFixed(1))
-  const margemAbate = margem
+  const margemBoi     = Number(((precos.boi - custoAteBoi) / precos.boi * 100).toFixed(1))
+  const margemAbate   = Number(((precos.abate - custoAteAbate) / precos.abate * 100).toFixed(1))
 
-  res.json({ rebanho, precos, margem, margemGarrote, margemBoi, margemAbate })
+  res.json({ rebanho, precos, margem: margemAbate, margemGarrote, margemBoi, margemAbate })
 }

@@ -618,13 +618,21 @@ export default function App() {
   function calcCot(qty){
     if(!mercado||!qty) return null
     const{precos}=mercado
+    const r=precos.precoRacao
     const custoBezerros=qty*precos.bezerro
     const custoFrete=qty*precos.frete
-    const custoRacao=qty*precos.racaoPorCabeca*precos.precoRacao
+    const custoRacaoBezerro=Math.round(qty*21*r*100)/100
+    const custoRacaoGarrote=Math.round(qty*35*r*100)/100
+    const custoRacaoBoi=Math.round(qty*56*r*100)/100
+    const custoRacao=custoRacaoBezerro+custoRacaoGarrote+custoRacaoBoi
     const total=custoBezerros+custoFrete+custoRacao
     const receita=qty*precos.abate
+    const receitaGarrote=qty*precos.garrote
+    const receitaBoi=qty*precos.boi
+    const margemGarrote=((receitaGarrote-(custoBezerros+custoFrete+custoRacaoBezerro+custoRacaoGarrote))/receitaGarrote*100).toFixed(1)
+    const margemBoi=((receitaBoi-(custoBezerros+custoFrete+custoRacaoBezerro+custoRacaoGarrote+custoRacaoBoi))/receitaBoi*100).toFixed(1)
     const margem=((receita-total)/receita*100).toFixed(1)
-    return{custoBezerros,custoFrete,custoRacao,total,receita,margem,qty}
+    return{custoBezerros,custoFrete,custoRacao,custoRacaoBezerro,custoRacaoGarrote,custoRacaoBoi,total,receita,receitaGarrote,receitaBoi,margem,margemGarrote,margemBoi,qty}
   }
 
   const meusLotes = lotes.filter(l=>String(l.jogador_id)===String(user?.id))
@@ -758,7 +766,7 @@ export default function App() {
                 <div style={gs(110)}>
                   <Metric T={T} icon="🐄" label="Rebanho" value={`${mercado?.rebanho?.total||0}`} sub="cabeças ativas" color={mercado?.rebanho?.total>600?T.red:mercado?.rebanho?.total>400?T.amber:T.gold}/>
                   <Metric T={T} icon="💰" label="Margem est." value={`${mercado?.margem||'~30'}%`} sub="bezerro→abate" color={T.gold}/>
-                  <Metric T={T} icon="🌾" label="Ração" value={`$${mercado?.precos?.precoRacao||2}/kg`} sub="112kg/cabeça"/>
+                  <Metric T={T} icon="🌾" label="Ração" value={`$${mercado?.precos?.precoRacao||2}/kg`} sub="ciclo completo (bezerro→abate)"/>
                   <Metric T={T} icon="📦" label="Custo/cab" value={`$${fmt(mercado?.precos?.custoRacao)}`} sub="ração total"/>
                 </div>
                 <div style={{marginTop:16}}>
@@ -813,7 +821,7 @@ export default function App() {
                   {cot&&<>
                     <div style={{background:T.inputBg,borderRadius:12,padding:18,marginBottom:16,border:`1px solid ${T.border}`}}>
                       <div style={{fontSize:11,color:T.textMuted,marginBottom:12,fontWeight:600,textTransform:'uppercase',letterSpacing:'.6px'}}>Breakdown</div>
-                      {[[`${cot.qty}× Bezerro ($${fmt(mercado.precos.bezerro)}/cab)`,cot.custoBezerros],['Frete ($50/cab)',cot.custoFrete],[`Ração (${mercado.precos.racaoPorCabeca}kg × ${cot.qty} × $${mercado.precos.precoRacao}/kg)`,cot.custoRacao]].map(([l,v])=>(
+                      {[[`${cot.qty}× Bezerro ($${fmt(mercado.precos.bezerro)}/cab)`,cot.custoBezerros],[`Frete ($${mercado.precos.frete}/cab)`,cot.custoFrete],[`Ração bezerro (21kg × $${mercado.precos.precoRacao})`,cot.custoRacaoBezerro],[`Ração garrote (35kg × $${mercado.precos.precoRacao})`,cot.custoRacaoGarrote],[`Ração boi (56kg × $${mercado.precos.precoRacao})`,cot.custoRacaoBoi]].map(([l,v])=>(
                         <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:10,color:T.textDim,paddingBottom:10,borderBottom:`1px solid ${T.border}`}}>
                           <span>{l}</span><span style={{fontWeight:500}}>${fmt(v)}</span>
                         </div>
