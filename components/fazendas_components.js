@@ -1,3 +1,4 @@
+// v25 — animação mercado + simulador por fase + preços por fase
 import { useState, useEffect, useCallback } from 'react'
 
 const fmt = n => Number(n||0).toLocaleString('pt-BR')
