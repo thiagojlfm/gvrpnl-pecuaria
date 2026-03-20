@@ -15,6 +15,13 @@ const ORIGENS_NPC = [
   'Curral Gov. NPC', 'Posto Agropecuário', 'Centro de Distribuição'
 ]
 
+// Confinamentos NPC para venda de garrotes superlotados
+const CONFINAMENTOS = [
+  { nome: 'Confinamento Norte', regiao: 'Green Hills Norte', desconto: 0.08, cor: '#4060d0' },
+  { nome: 'Confinamento Oeste', regiao: 'Lake Ville Oeste', desconto: 0.12, cor: '#c8922a' },
+  { nome: 'Confinamento Sudeste', regiao: 'Green Hills Sudeste', desconto: 0.10, cor: '#4a8a30' },
+]
+
 export default async function handler(req, res) {
   const token = getTokenFromReq(req)
   const user = token ? verifyToken(token) : null
@@ -94,6 +101,23 @@ export default async function handler(req, res) {
           { ha: 50, valor: 50 * PASTO_PRECO_POR_HA, label: 'Pasto Grande — 50 ha' },
         ]
       })
+    }
+
+    if (tipo === 'confinamentos') {
+      // Retorna confinamentos com preço calculado pelo mercado atual
+      const { data: lotes } = await query(
+        `SELECT quantidade FROM lotes WHERE status IN ('ativo','em_transito') AND fase != 'abatido'`, []
+      )
+      const total = (lotes||[]).reduce((s,l) => s + l.quantidade, 0)
+      const ratio = Math.min(total / 400, 1)
+      const precoKg = 5 - ratio * 2
+      const precoGarrote = Math.round(400 * precoKg)
+
+      return res.json(CONFINAMENTOS.map(c => ({
+        ...c,
+        preco_cab: Math.round(precoGarrote * (1 - c.desconto)),
+        preco_mercado: precoGarrote,
+      })))
     }
 
     return res.status(400).json({ error: 'tipo inválido' })
@@ -185,6 +209,37 @@ export default async function handler(req, res) {
         quantidade: anuncio.quantidade,
         anuncio_id
       })
+    }
+
+    if (action === 'vender_confinamento') {
+      const { lote_id, confinamento_nome, valor_total } = req.body
+      const { data: lote } = await queryOne(`SELECT * FROM lotes WHERE id=$1 AND jogador_id=$2`, [lote_id, user.id])
+      if (!lote) return res.status(404).json({ error: 'Lote não encontrado' })
+
+      await query(`UPDATE lotes SET status='vendido' WHERE id=$1`, [lote_id])
+      await query(
+        `INSERT INTO transacoes (tipo, lote_id, lote_codigo, de_jogador, para_jogador, quantidade, valor, fase, status)
+         VALUES ('venda_confinamento',$1,$2,$3,$4,$5,$6,'garrote','aguardando')`,
+        [lote.id, lote.codigo, user.username, confinamento_nome, lote.quantidade, valor_total]
+      )
+      // Gerar frete para o confinamento
+      const chegaEm = new Date(Date.now() + 60 * 60 * 1000)
+      const buscaEm = new Date(Date.now() + 30 * 60 * 1000)
+      await query(
+        `INSERT INTO fretes_transportadora (lote_id, lote_codigo, origem, destino, quantidade, valor, comprador_id, status, bloco_num, bloco_total)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel',1,1)`,
+        [lote.id, lote.codigo, 'Fazenda do Produtor', confinamento_nome,
+         lote.quantidade, Math.round(lote.quantidade * 30), user.id]
+      )
+      // Notificar transportadores
+      const { data: trans } = await query(`SELECT DISTINCT jogador_id FROM caminhoes WHERE status='disponivel'`, [])
+      for (const t of (trans||[])) {
+        await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+          [t.jogador_id, '🚛 Frete disponível!', `${lote.quantidade} garrotes → ${confinamento_nome}`])
+      }
+      await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+        [user.id, '✅ Venda registrada!', `${lote.quantidade} garrotes vendidos ao ${confinamento_nome} por $${valor_total}. Aguarde addmoney do admin.`])
+      return res.json({ ok: true })
     }
 
     if (action === 'aceitar_oferta_npc') {

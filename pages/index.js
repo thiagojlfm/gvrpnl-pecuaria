@@ -1,4 +1,4 @@
-import { FazendasPage, MinhaFazendaPage, CeleiroPage, TransportadoraPage, ConcessionariaPage, FretesNPCPage, BotaoOfertaNPC } from '../components/fazendas_components'
+import { FazendasPage, MinhaFazendaPage, CeleiroPage, TransportadoraPage, ConcessionariaPage, FretesNPCPage, BotaoOfertaNPC, PastagemPage } from '../components/fazendas_components'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Head from 'next/head'
 
@@ -405,6 +405,7 @@ const NAV_ITEMS = [
   {id:'rebanho',icon:'🐄',label:'Rebanho',pub:false},
   {id:'venda',icon:'🤝',label:'Venda',pub:false},
   {id:'fazendas',icon:'🏡',label:'Fazendas',pub:true},
+  {id:'pastagem',icon:'🌿',label:'Aluguel de Pasto',pub:true},
   {id:'minha_fazenda',icon:'🌾',label:'Minha Fazenda',pub:false},
   {id:'celeiro',icon:'🏚',label:'Celeiro',pub:false},
   {id:'transportadora',icon:'🚛',label:'Transportadora',pub:false},
@@ -961,7 +962,10 @@ export default function App() {
                   a.fazenda||'—',faseBadge(a.fase),a.quantidade,
                   <span style={{fontWeight:700,color:T.gold,fontFamily:"'Playfair Display',serif"}}>${fmt(a.preco_pedido)}</span>,
                   a.obs?<span style={{fontSize:11,color:T.textMuted}}>{a.obs}</span>:'',
-                  <Btn T={T} v="amber" style={{padding:'6px 12px',fontSize:12}} onClick={()=>{sounds.click();setChatAnuncio(a)}}>💬 Negociar</Btn>
+                  <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                    <Btn T={T} v="amber" style={{padding:'6px 12px',fontSize:12}} onClick={()=>{sounds.click();setChatAnuncio(a)}}>💬 Negociar</Btn>
+                    {String(a.vendedor_id)===String(user?.id)&&a.fase==='garrote'&&<BotaoOfertaNPC anuncio={a} T={T} api={api} notify={notify} sounds={sounds} onVendido={()=>{api('/api/anuncios').then(setAnuncios);api('/api/lotes').then(setLotes)}}/>}
+                  </div>
                 ])}/>
             </Card>
             {user&&<div style={gs(280)}>
@@ -987,7 +991,28 @@ export default function App() {
                   <Inp T={T} label="Comprador" value={p2p.comprador_nome} onChange={e=>setP2p(f=>({...f,comprador_nome:e.target.value}))} placeholder="NomeJogador"/>
                   <Inp T={T} label="Preço final ($)" type="number" value={p2p.preco_final} onChange={e=>setP2p(f=>({...f,preco_final:e.target.value}))}/>
                 </div>
-                <Btn T={T} onClick={async()=>{const r=await api('/api/anuncios',{method:'PATCH',body:JSON.stringify(p2p)});if(!r.error){sounds.coin();notify('✓ Venda registrada!');reload()}}}>Registrar venda</Btn>
+                <Btn T={T} onClick={async()=>{
+  const r=await api('/api/anuncios',{method:'PATCH',body:JSON.stringify(p2p)});
+  if(!r.error){
+    sounds.coin();
+    notify('✓ Venda registrada! Frete gerado na transportadora.');
+    // Gerar frete para a venda entre jogadores
+    if(r.lote_id && r.comprador_nome) {
+      const anuncio = anuncios.find(a=>a.id===p2p.anuncio_id)
+      if(anuncio) {
+        await api('/api/fretes_venda',{method:'POST',body:JSON.stringify({
+          lote_id: r.lote_id,
+          lote_codigo: anuncio.lote_codigo,
+          quantidade: anuncio.quantidade,
+          vendedor_nome: anuncio.vendedor_nome,
+          comprador_id: r.comprador_id,
+          comprador_nome: r.comprador_nome,
+        })})
+      }
+    }
+    reload()
+  }
+}}>Registrar venda</Btn>
               </Card>}
             </div>}
           </>}
@@ -1436,6 +1461,7 @@ export default function App() {
 
           {/* ── FAZENDAS ── */}
           {page==='fazendas'&&<FazendasPage T={T} user={user} api={api} notify={notify} users={users}/>}
+          {page==='pastagem'&&<PastagemPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}
           {page==='minha_fazenda'&&<MinhaFazendaPage T={T} user={user} api={api} notify={notify} lotes={lotes} mercado={mercado}/>}
           {page==='celeiro'&&<CeleiroPage T={T} user={user} api={api} notify={notify} mercado={mercado} sounds={sounds}/>}
           {page==='transportadora'&&<TransportadoraPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}

@@ -79,11 +79,12 @@ export default async function handler(req, res) {
       )
     }
 
-    // Recalcular datas a partir de HOJE para as fases restantes
+    // Recalcular datas a partir de HOJE para as fases FUTURAS (não a fase atual)
     const hoje = new Date()
     const datasUpdate = {}
-    const fasesRestantes = FASES.slice(idx + 1)
-    fasesRestantes.forEach((f, i) => {
+    // idx+1 é a nova fase atual, idx+2 em diante são as futuras
+    const fasesFuturas = FASES.slice(idx + 2)
+    fasesFuturas.forEach((f, i) => {
       const d = new Date(hoje)
       d.setDate(d.getDate() + (i + 1) * 7)
       if (f === 'garrote') datasUpdate.data_fase2 = d.toISOString().split('T')[0]

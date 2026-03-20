@@ -2426,3 +2426,162 @@ export function BotaoOfertaNPC({ anuncio, T, api, notify, sounds, onVendido }) {
     </button>
   )
 }
+
+// ─── Pastagem Page ────────────────────────────────────────────────────────────
+export function PastagemPage({ T, user, api, notify, sounds }) {
+  const [dados, setDados] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [alugando, setAlugando] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const r = await fetch('/api/pastagem').then(r=>r.json())
+    setDados(r)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function alugar(campo) {
+    if (!user) return notify('Faça login primeiro!', 'danger')
+    const r = await api('/api/pastagem', { method:'POST', body: JSON.stringify({ campo_id: campo.id }) })
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.success()
+    notify(`✓ ${campo.nome} reservado! Pague $${fmt(campo.preco_semana)} ao admin para confirmar.`)
+    setAlugando(null)
+    load()
+  }
+
+  if (loading) return <div style={{textAlign:'center',padding:60,color:T.textMuted}}>Carregando...</div>
+
+  const campos = dados?.campos || []
+  const meus = dados?.meus || []
+
+  return (
+    <div>
+      <div style={{ marginBottom:28, paddingBottom:16, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
+          <span style={{ fontSize:24 }}>🌿</span>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Aluguel de Pasto</h1>
+        </div>
+        <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Alugue campos extras quando sua fazenda estiver superlotada — 7 dias por contrato</p>
+      </div>
+
+      {/* Meus aluguéis ativos */}
+      {meus.length > 0 && (
+        <div style={{ background:T.card, border:'1px solid #2a5a12', borderRadius:14, padding:18, marginBottom:20 }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:'#4ad4a0', marginBottom:12 }}>Seus aluguéis ativos</div>
+          {meus.map(a => (
+            <div key={a.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:`1px solid ${T.border}`, fontSize:13 }}>
+              <div>
+                <div style={{ fontWeight:600, color:T.text }}>{a.campo_nome}</div>
+                <div style={{ fontSize:11, color:T.textMuted }}>{a.ha_alugado}ha · válido até {new Date(a.valido_ate).toLocaleDateString('pt-BR')}</div>
+              </div>
+              <span style={{ color:'#4ad4a0', fontWeight:700, fontFamily:"'Playfair Display',serif" }}>${fmt(a.valor_pago)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Info */}
+      <div style={{ background:'rgba(42,24,0,.3)', border:`1px solid ${T.border}`, borderRadius:12, padding:'12px 16px', marginBottom:20, fontSize:12, color:'#a08040', lineHeight:1.7 }}>
+        💡 Reserve o campo aqui e pague ao admin no servidor. O contrato dura 7 dias, mesmo ciclo do gado. Campos seguem as mesmas regras de capacidade: 3 bezerros/ha, 2 garrotes/ha, 1 boi/ha.
+      </div>
+
+      {/* Grid de campos */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 }}>
+        {campos.map(c => {
+          const meuCampo = meus.find(a => a.campo_id === c.id)
+          return (
+            <div key={c.id} style={{ background:T.card, border:`1px solid ${c.meu?'#2a5a12':c.ocupado?T.border:'#2a3a18'}`, borderRadius:16, overflow:'hidden', transition:'all .25s' }}
+              onMouseEnter={e=>{if(!c.ocupado&&!c.meu)e.currentTarget.style.borderColor='#4a6a28'}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=c.meu?'#2a5a12':c.ocupado?T.border:'#2a3a18'}}>
+              <div style={{ height:150, overflow:'hidden', position:'relative', background:'#0a1208' }}>
+                <img src={c.foto_url} alt={c.nome} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.65)', transition:'transform .4s' }}
+                  onMouseEnter={e=>e.target.style.transform='scale(1.06)'}
+                  onMouseLeave={e=>e.target.style.transform='scale(1)'}
+                  onError={e=>e.target.style.display='none'}/>
+                <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.7),transparent 50%)' }}/>
+                <div style={{ position:'absolute', top:10, left:10, display:'flex', gap:6 }}>
+                  <span style={{ background:'rgba(10,18,8,.85)', border:'1px solid #2a4a18', color:'#6ab840', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>
+                    {c.ha}ha
+                  </span>
+                  {c.meu && <span style={{ background:'rgba(10,42,10,.9)', border:'1px solid #2a5a12', color:'#4ad4a0', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>✓ Seu</span>}
+                  {c.ocupado && !c.meu && <span style={{ background:'rgba(42,10,10,.9)', border:'1px solid #6a1818', color:'#e06060', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>Ocupado</span>}
+                </div>
+                <div style={{ position:'absolute', bottom:10, left:12, right:12 }}>
+                  <div style={{ fontSize:15, fontWeight:700, color:'#fff', fontFamily:"'Playfair Display',serif" }}>{c.nome}</div>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,.6)' }}>{c.regiao}</div>
+                </div>
+              </div>
+              <div style={{ padding:'14px 16px' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:14 }}>
+                  {[['🐄',`${c.cap_bezerros} bzerr.`],['🐂',`${c.cap_garrotes} garr.`],['🐃',`${c.cap_bois} bois`]].map(([e,v]) => (
+                    <div key={v} style={{ background:T.inputBg, borderRadius:8, padding:'6px 4px', textAlign:'center', border:`1px solid ${T.border}` }}>
+                      <div style={{ fontSize:14 }}>{e}</div>
+                      <div style={{ fontSize:10, color:T.textMuted }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <div>
+                    <div style={{ fontSize:20, fontWeight:800, color:'#6ab840', fontFamily:"'Playfair Display',serif" }}>${fmt(c.preco_semana)}</div>
+                    <div style={{ fontSize:10, color:T.textMuted }}>por semana</div>
+                  </div>
+                  {c.meu ? (
+                    <div style={{ fontSize:12, color:'#4ad4a0', fontWeight:600 }}>
+                      Válido até {new Date(meuCampo?.valido_ate).toLocaleDateString('pt-BR')}
+                    </div>
+                  ) : c.ocupado ? (
+                    <div style={{ fontSize:12, color:T.textMuted, fontStyle:'italic' }}>Indisponível</div>
+                  ) : (
+                    <button onClick={() => setAlugando(c)}
+                      style={{ padding:'8px 16px', background:'linear-gradient(135deg,#1a4a10,#3a7a20)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                      Reservar
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Modal confirmar aluguel */}
+      {alugando && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
+          <div style={{ background:T.card, border:'1px solid #2a5a12', borderRadius:20, padding:32, width:'100%', maxWidth:400, boxShadow:'0 30px 80px rgba(0,0,0,.5)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+              <h3 style={{ fontFamily:"'Playfair Display',serif", fontSize:18, color:T.text }}>🌿 Reservar pasto</h3>
+              <button onClick={()=>setAlugando(null)} style={{ background:'none', border:'none', color:T.textMuted, fontSize:22, cursor:'pointer' }}>×</button>
+            </div>
+            <div style={{ background:T.inputBg, borderRadius:12, padding:16, marginBottom:20, border:`1px solid ${T.border}` }}>
+              {[
+                ['Campo', alugando.nome],
+                ['Região', alugando.regiao],
+                ['Área', `${alugando.ha} hectares`],
+                ['Capacidade', `${alugando.cap_garrotes} garrotes / ${alugando.cap_bois} bois`],
+                ['Duração', '7 dias'],
+                ['Valor', `$${fmt(alugando.preco_semana)}`],
+              ].map(([l,v]) => (
+                <div key={l} style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:8 }}>
+                  <span style={{ color:T.textMuted }}>{l}</span>
+                  <span style={{ fontWeight:l==='Valor'?800:400, color:l==='Valor'?'#6ab840':T.text, fontFamily:l==='Valor'?"'Playfair Display',serif":'inherit' }}>{v}</span>
+                </div>
+              ))}
+              <div style={{ fontSize:11, color:'#a08040', marginTop:8, padding:'8px 0', borderTop:`1px solid ${T.border}` }}>
+                ⚠ Após reservar, pague o valor ao admin no servidor para ativar o contrato.
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={()=>setAlugando(null)} style={{ flex:1, padding:10, background:'transparent', border:`1px solid ${T.border2}`, color:T.textDim, borderRadius:10, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+              <button onClick={()=>alugar(alugando)} style={{ flex:2, padding:10, background:'linear-gradient(135deg,#1a4a10,#3a7a20)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                ✓ Reservar campo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

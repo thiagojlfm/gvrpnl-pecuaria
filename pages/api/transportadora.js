@@ -19,19 +19,9 @@ export default async function handler(req, res) {
 
     if (tipo === 'disponiveis') {
       if (!user) return res.status(401).json({ error: 'Não autorizado' })
-      // Check user's caminhoes to filter fretes by tipo
-      const { data: meusCam } = await query(
-        `SELECT tipo, racao_cap, capacidade FROM caminhoes WHERE jogador_id=$1 AND status='disponivel'`, [user.id]
-      )
-      const temVan = (meusCam||[]).some(c => c.tipo === 'racao')
-      const temTruck = (meusCam||[]).some(c => (c.tipo||'gado') === 'gado')
-      // Show ração fretes if has van/truck with racao_cap, show gado fretes if has truck
-      let whereClause = `status = 'disponivel'`
-      if (temVan && !temTruck) whereClause += ` AND tipo_carga = 'racao'`
-      else if (!temVan && temTruck) whereClause += ` AND (tipo_carga = 'gado' OR tipo_carga IS NULL)`
-      // else show all if has both
+      // Show all fretes - client filters by caminhao capacity
       const { data } = await query(
-        `SELECT * FROM fretes_transportadora WHERE ${whereClause} ORDER BY criado_em DESC`, []
+        `SELECT * FROM fretes_transportadora WHERE status = 'disponivel' ORDER BY tipo_carga, criado_em DESC`, []
       )
       return res.json(data || [])
     }
