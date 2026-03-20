@@ -73,7 +73,7 @@ export default async function handler(req, res) {
     const { data, error } = await queryOne(
       `INSERT INTO lotes (codigo, jogador_id, jogador_nome, fazenda, fazenda_id, quantidade, fase, peso_kg, valor_compra, data_compra, data_fase2, data_fase3, data_fase4, status, comprovante)
        VALUES ($1,$2,$3,$4,$5,$6,'bezerro',180,$7,$8,$9,$10,$11,'ativo',$12) RETURNING *`,
-      [codigo, jogador_id, jogador_nome, fazenda||'', fazenda_id||null, quantidade, valor_compra||1100,
+      [codigo, jogador_id, jogador_nome, fazenda||'', fazenda_id||null, quantidade, valor_compra||800,
        dataCompra.toISOString().split('T')[0], fase2.toISOString().split('T')[0],
        fase3.toISOString().split('T')[0], fase4.toISOString().split('T')[0], comprovante||'']
     )
@@ -82,7 +82,7 @@ export default async function handler(req, res) {
     await query(
       `INSERT INTO transacoes (tipo, lote_id, lote_codigo, de_jogador, para_jogador, quantidade, valor, fase, status)
        VALUES ('compra_npc',$1,$2,'Posto Agropecuário',$3,$4,$5,'bezerro','concluido')`,
-      [data.id, codigo, jogador_nome, quantidade, quantidade * (valor_compra||1100)]
+      [data.id, codigo, jogador_nome, quantidade, quantidade * (valor_compra||800)]
     )
 
     await query(`INSERT INTO admin_log (admin_nome, acao, detalhes) VALUES ($1,$2,$3)`,

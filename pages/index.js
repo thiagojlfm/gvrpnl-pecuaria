@@ -503,7 +503,7 @@ export default function App() {
   const [dividirQtd, setDividirQtd] = useState('')
   const [viewProfile, setViewProfile] = useState(null)
   const [profileData, setProfileData] = useState(null)
-  const [nLote, setNLote] = useState({jogador_id:'',jogador_nome:'',fazenda:'',fazenda_id:'',quantidade:1,valor_compra:1100,data_compra:'',comprovante:''})
+  const [nLote, setNLote] = useState({jogador_id:'',jogador_nome:'',fazenda:'',fazenda_id:'',quantidade:1,valor_compra:800,data_compra:'',comprovante:''})
   const [nUser, setNUser] = useState({username:'',password:'',fazenda:''})
   const [nAnuncio, setNAnuncio] = useState({lote_id:'',preco_pedido:'',obs:''})
   const [p2p, setP2p] = useState({anuncio_id:'',comprador_nome:'',preco_final:'',lote_id:''})

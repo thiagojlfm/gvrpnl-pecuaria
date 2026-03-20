@@ -111,7 +111,8 @@ export default async function handler(req, res) {
       const total = (lotes||[]).reduce((s,l) => s + l.quantidade, 0)
       const ratio = Math.min(total / 400, 1)
       const precoKg = 5 - ratio * 2
-      const precoGarrote = Math.round(400 * precoKg)
+      const precoKgGarrote = 2.73 - ratio * 0.53
+      const precoGarrote = Math.round(400 * precoKgGarrote)
 
       return res.json(CONFINAMENTOS.map(c => ({
         ...c,
@@ -151,8 +152,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: `Caminhão comporta ${cam.capacidade} cab., frete tem ${frete.quantidade}` })
       }
 
-      // Duração: 45min (NPC é mais simples)
-      const entregaEm = new Date(Date.now() + 45 * 60 * 1000)
+      // Duração: 30min base + 10min a cada $200 de valor
+      const minutosExtra = Math.floor(frete.valor / 200) * 10
+      const minutos = 30 + minutosExtra
+      const entregaEm = new Date(Date.now() + minutos * 60 * 1000)
 
       await queryOne(
         `UPDATE fretes_npc SET status='em_rota', transportador_id=$1, transportador_nome=$2,
@@ -199,7 +202,10 @@ export default async function handler(req, res) {
       const totalRebanho = parseInt(mercado?.total || 0)
       const ratio = Math.min(totalRebanho / 400, 1)
       const precoKg = 5 - ratio * 2
-      const valorMercado = Math.round(400 * precoKg * anuncio.quantidade)
+      // Oferta baseada no preço do GARROTE (400kg * precoKg) - não do abate
+      const precoKgGarrote = 2.73 - ratio * 0.53
+      const precoGarrote = Math.round(400 * precoKgGarrote)
+      const valorMercado = precoGarrote * anuncio.quantidade
       const ofertaNPC = Math.round(valorMercado * OFERTA_NPC_PORCENTO)
 
       return res.json({

@@ -1815,7 +1815,7 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
       {/* Instrução */}
       <div style={{ background:T.inputBg, borderRadius:12, padding:'12px 16px', border:`1px solid ${T.border}`, fontSize:13, color:T.textDim, lineHeight:1.6 }}>
-        💡 Selecione os blocos que quer transportar. {fretes[0]?.tipo_carga==='racao'?'Cada bloco = 1.500kg de ração.':'Cada bloco = 30 cab.'} Você pode pegar múltiplos blocos — cada um adiciona <strong style={{color:T.text}}>+15min</strong> na rota.
+        💡 Selecione os blocos que quer transportar. {fretes[0]?.tipo_carga==='racao'?'Blocos de 1.500kg de ração.':'Blocos de 30 cabeças.'} 1 bloco = 1h · cada bloco extra +15min.
       </div>
 
       {/* Blocos por lote */}
@@ -1860,7 +1860,9 @@ function FretesBlocos({ fretes, T, caminhoesLivres, onAceitar }) {
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
             <div style={{ background:T.inputBg, borderRadius:8, padding:'8px 10px', textAlign:'center', border:`1px solid ${T.border}` }}>
               <div style={{ fontSize:10, color:T.textMuted, marginBottom:2 }}>DURAÇÃO</div>
-              <div style={{ fontSize:14, fontWeight:700, color:T.text }}>{selecionados.length === 1 ? '1h' : `1h${(selecionados.length-1)*15}min`}</div>
+              <div style={{ fontSize:14, fontWeight:700, color:T.text }}>
+                {selecionados.length === 1 ? '1h' : `${Math.floor((60+(selecionados.length-1)*15)/60)}h${(60+(selecionados.length-1)*15)%60>0?`${(60+(selecionados.length-1)*15)%60}min`:''}`}
+              </div>
             </div>
             <div style={{ background:T.inputBg, borderRadius:8, padding:'8px 10px', textAlign:'center', border:`1px solid ${T.border}` }}>
               <div style={{ fontSize:10, color:T.textMuted, marginBottom:2 }}>CARGA</div>
@@ -2221,7 +2223,7 @@ export function FretesNPCPage({ T, user, api, notify, sounds }) {
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {/* Info */}
             <div style={{ background:'rgba(42,24,0,.4)', border:'1px solid #4a3010', borderRadius:12, padding:'12px 16px', fontSize:12, color:'#a08040', marginBottom:4 }}>
-              ⚠ Fretes NPC pagam <strong>60% do valor normal</strong> e duram <strong>45 minutos</strong>. Use quando não tiver frete de jogador disponível.
+              ⚠ Fretes NPC pagam <strong>60% do valor normal</strong>. Tempo varia pelo valor: 30min base + 10min a cada $200. Use quando não tiver frete de jogador disponível.
             </div>
             {fretes.filter(f=>f.status==='disponivel').map(f => (
               <div key={f.id} style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:18, display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
@@ -2231,7 +2233,7 @@ export function FretesNPCPage({ T, user, api, notify, sounds }) {
                     {f.quantidade} {f.tipo_carga==='racao'?'kg de ração':'cabeças de gado'}
                   </div>
                   <div style={{ fontSize:12, color:T.textMuted, marginTop:2 }}>{f.origem} → {f.destino}</div>
-                  <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>⏱ 45 min · NPC</div>
+                  <div style={{ fontSize:11, color:T.textMuted, marginTop:2 }}>⏱ {Math.round(30 + Math.floor(f.valor/200)*10)} min · NPC</div>
                 </div>
                 <div style={{ textAlign:'right' }}>
                   <div style={{ fontSize:20, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(f.valor)}</div>
@@ -2281,7 +2283,7 @@ export function FretesNPCPage({ T, user, api, notify, sounds }) {
               {[
                 ['Carga', `${aceitando.quantidade} ${aceitando.tipo_carga==='racao'?'kg de ração':'cabeças'}`],
                 ['Rota', `${aceitando.origem} → ${aceitando.destino}`],
-                ['Duração', '45 minutos'],
+                ['Duração', `${Math.round(30 + Math.floor(aceitando.valor/200)*10)} minutos`],
                 ['Ganho', `$${fmt(aceitando.valor)}`],
               ].map(([l,v]) => (
                 <div key={l} style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:8 }}>

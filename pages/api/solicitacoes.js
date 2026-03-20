@@ -45,6 +45,29 @@ export default async function handler(req, res) {
 
     // Se aprovado → criar lote automaticamente
     if (status === 'aprovado') {
+      // Anti-farm: max 3 compras por dia por jogador
+      const { data: comprasHoje } = await queryOne(
+        `SELECT COUNT(*) as total FROM solicitacoes 
+         WHERE jogador_id=$1 AND status='aprovado' 
+         AND criado_em > NOW() - INTERVAL '24 hours'`,
+        [solic.jogador_id]
+      )
+      const totalHoje = parseInt(comprasHoje?.total || 0)
+      if (totalHoje >= 3) {
+        return res.status(400).json({ error: `Limite diário atingido! ${solic.jogador_nome} já fez 3 compras hoje. Máximo 3 lotes por dia.` })
+      }
+
+      // Anti-farm: max 500 cabeças ativas por jogador
+      const { data: cabAtivas } = await queryOne(
+        `SELECT COALESCE(SUM(quantidade),0) as total FROM lotes 
+         WHERE jogador_id=$1 AND status NOT IN ('pago','vendido')`,
+        [solic.jogador_id]
+      )
+      const totalCab = parseInt(cabAtivas?.total || 0)
+      if (totalCab + solic.quantidade > 500) {
+        return res.status(400).json({ error: `Limite de rebanho atingido! ${solic.jogador_nome} tem ${totalCab} cabeças. Máximo 500 cabeças ativas por jogador.` })
+      }
+
       // Get jogador info
       const { data: jogador } = await queryOne(`SELECT * FROM usuarios WHERE id = $1`, [solic.jogador_id])
 
@@ -66,7 +89,7 @@ export default async function handler(req, res) {
          VALUES ($1,$2,$3,$4,$5,$6,'bezerro',180,$7,$8,$9,$10,$11,'ativo',$12) RETURNING *`,
         [codigo, solic.jogador_id, solic.jogador_nome || jogador?.username,
          jogador?.fazenda || '', solic.fazenda_id || null,
-         solic.quantidade, solic.quantidade > 0 ? (solic.valor_total / solic.quantidade) : 1100,
+         solic.quantidade, solic.quantidade > 0 ? (solic.valor_total / solic.quantidade) : 800,
          hoje.toISOString().split('T')[0],
          fase2.toISOString().split('T')[0],
          fase3.toISOString().split('T')[0],

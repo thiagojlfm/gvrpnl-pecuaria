@@ -3,12 +3,12 @@ import { verifyToken, getTokenFromReq } from '../../lib/auth'
 
 // 6 campos de pasto NPC com tamanhos e preços variados
 const CAMPOS_PASTO = [
-  { id:1, nome:'Campo Verde Norte', regiao:'Green Hills Norte', ha:20, preco_semana:3500, foto_url:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80', disponivel:true },
-  { id:2, nome:'Pastagem Rio Claro', regiao:'Green Hills Sul', ha:35, preco_semana:5800, foto_url:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80', disponivel:true },
-  { id:3, nome:'Campo Dourado Oeste', regiao:'Lake Ville', ha:50, preco_semana:7500, foto_url:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80', disponivel:true },
-  { id:4, nome:'Pasto Serra Alta', regiao:'Green Hills Talhões', ha:25, preco_semana:4200, foto_url:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80', disponivel:true },
-  { id:5, nome:'Retiro Bela Vista', regiao:'Lake Ville Talhões', ha:40, preco_semana:6200, foto_url:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80', disponivel:true },
-  { id:6, nome:'Campo Novo Horizonte', regiao:'Green Hills', ha:70, preco_semana:10500, foto_url:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80', disponivel:true },
+  { id:1, nome:'Campo Verde Norte', regiao:'Green Hills Norte', ha:20, preco_semana:21000, foto_url:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80', disponivel:true },
+  { id:2, nome:'Pastagem Rio Claro', regiao:'Green Hills Sul', ha:35, preco_semana:34800, foto_url:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80', disponivel:true },
+  { id:3, nome:'Campo Dourado Oeste', regiao:'Lake Ville', ha:50, preco_semana:45000, foto_url:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80', disponivel:true },
+  { id:4, nome:'Pasto Serra Alta', regiao:'Green Hills Talhões', ha:25, preco_semana:25200, foto_url:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80', disponivel:true },
+  { id:5, nome:'Retiro Bela Vista', regiao:'Lake Ville Talhões', ha:40, preco_semana:37200, foto_url:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80', disponivel:true },
+  { id:6, nome:'Campo Novo Horizonte', regiao:'Green Hills', ha:70, preco_semana:63000, foto_url:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80', disponivel:true },
 ]
 
 const CAP_POR_HA = { bezerro:3, garrote:2, boi:1 }
