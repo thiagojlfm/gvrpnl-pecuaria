@@ -902,8 +902,6 @@ export default function App() {
                       Você paga apenas bezerros + frete agora. Ração por fase à medida que avançar.
                     </div>
                   </>}
-                    <Btn onClick={async()=>{if(!compraComp) return notify('Cole o comprovante!','danger');const r=await api('/api/solicitacoes',{method:'POST',body:JSON.stringify({quantidade:compraQt,valor_total:cot.total,custo_racao:cot.custoRacao,comprovante:compraComp})});if(!r.error){setCompraStep(3);sounds.coin();api('/api/solicitacoes').then(setSolic)}}} T={T} style={{flex:2,padding:12}}>Enviar solicitação</Btn>
-                  </div>
                 </>}
               </Card>
               <Card T={T} hover={false}>
