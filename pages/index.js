@@ -902,6 +902,7 @@ export default function App() {
                       Você paga apenas bezerros + frete agora. Ração por fase à medida que avançar.
                     </div>
                   </>}
+                </>}
                 {compraStep===2&&<>
                   <div style={{background:T.inputBg,borderRadius:12,padding:16,marginBottom:16,border:`1px solid ${T.border}`}}>
                     <div style={{fontSize:11,color:T.textMuted,fontWeight:600,textTransform:'uppercase',letterSpacing:'.6px',marginBottom:12}}>Resumo da compra</div>
@@ -928,7 +929,6 @@ export default function App() {
                       else notify('Erro: '+r.error,'danger')
                     }} T={T} style={{flex:2,padding:12}}>Enviar solicitação</Btn>
                   </div>
-                </>}
                 </>}
               </Card>
               <Card T={T} hover={false}>
