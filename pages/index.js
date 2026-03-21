@@ -902,6 +902,33 @@ export default function App() {
                       Você paga apenas bezerros + frete agora. Ração por fase à medida que avançar.
                     </div>
                   </>}
+                {compraStep===2&&<>
+                  <div style={{background:T.inputBg,borderRadius:12,padding:16,marginBottom:16,border:`1px solid ${T.border}`}}>
+                    <div style={{fontSize:11,color:T.textMuted,fontWeight:600,textTransform:'uppercase',letterSpacing:'.6px',marginBottom:12}}>Resumo da compra</div>
+                    {[
+                      [`${compraQt}× Bezerro`, `$${fmt(cot?.custoBezerros||0)}`],
+                      ['Frete', `$${fmt(cot?.custoFrete||0)}`],
+                      ['Total a pagar agora', `$${fmt((cot?.custoBezerros||0)+(cot?.custoFrete||0))}`],
+                    ].map(([l,v])=>(
+                      <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:8,paddingBottom:8,borderBottom:`1px solid ${T.border}`}}>
+                        <span style={{color:T.textMuted}}>{l}</span>
+                        <span style={{fontWeight:700,color:T.text}}>{v}</span>
+                      </div>
+                    ))}
+                    <div style={{fontSize:11,color:'#a08040',marginTop:4}}>⚠ Ração das próximas fases será cobrada separado conforme avançar.</div>
+                  </div>
+                  <Inp T={T} label="Cole o link do comprovante" value={compraComp} onChange={e=>setCompraComp(e.target.value)} placeholder="discord.com/channels/..."/>
+                  <div style={{display:'flex',gap:10,marginTop:16}}>
+                    <Btn v="ghost" onClick={()=>setCompraStep(1)} T={T} style={{flex:1}}>Voltar</Btn>
+                    <Btn onClick={async()=>{
+                      if(!compraComp) return notify('Cole o comprovante!','danger')
+                      const total = (cot?.custoBezerros||0)+(cot?.custoFrete||0)
+                      const r=await api('/api/solicitacoes',{method:'POST',body:JSON.stringify({quantidade:compraQt,valor_total:total,custo_racao:cot?.custoRacaoBezerro||0,comprovante:compraComp})})
+                      if(!r.error){setCompraStep(3);sounds.coin();api('/api/solicitacoes').then(setSolic)}
+                      else notify('Erro: '+r.error,'danger')
+                    }} T={T} style={{flex:2,padding:12}}>Enviar solicitação</Btn>
+                  </div>
+                </>}
                 </>}
               </Card>
               <Card T={T} hover={false}>
