@@ -545,17 +545,18 @@ export default function App() {
     fetch('/api/fazendas').then(r=>r.json()).then(setFazendas)
   },[])
 
+  const safeArr = d => Array.isArray(d) ? d : []
   const reload = useCallback(()=>{
     if(!token) return
-    api('/api/lotes').then(setLotes)
-    api('/api/anuncios').then(setAnuncios)
-    api('/api/transacoes').then(setTrans)
-    api('/api/solicitacoes').then(setSolic)
-    api('/api/racao').then(setRacao)
-    api('/api/notificacoes').then(setNotifs)
-    api('/api/fazendas?minha=1').then(setMinhasFazendas)
+    api('/api/lotes').then(d=>setLotes(safeArr(d)))
+    api('/api/anuncios').then(d=>setAnuncios(safeArr(d)))
+    api('/api/transacoes').then(d=>setTrans(safeArr(d)))
+    api('/api/solicitacoes').then(d=>setSolic(safeArr(d)))
+    api('/api/racao').then(d=>{if(!d?.error) setRacao(d)})
+    api('/api/notificacoes').then(d=>setNotifs(safeArr(d)))
+    api('/api/fazendas?minha=1').then(d=>setMinhasFazendas(safeArr(d)))
     api('/api/perfil').then(p=>{if(!p?.error){setPerfil(p);setEditPerfil({fazenda:p.fazenda||'',foto_url:p.foto_url||'',bio:p.bio||'',nova_senha:''})}})
-    if(user?.role==='admin'){api('/api/admin/usuarios').then(setUsers);api('/api/admin/log').then(setAdminLog)}
+    if(user?.role==='admin'){api('/api/admin/usuarios').then(d=>setUsers(safeArr(d)));api('/api/admin/log').then(d=>setAdminLog(safeArr(d)))}
   },[token,api,user])
 
   useEffect(()=>{reload()},[reload])
@@ -925,7 +926,7 @@ export default function App() {
                       if(!compraComp) return notify('Cole o comprovante!','danger')
                       const total = (cot?.custoBezerros||0)+(cot?.custoFrete||0)
                       const r=await api('/api/solicitacoes',{method:'POST',body:JSON.stringify({quantidade:compraQt,valor_total:total,custo_racao:cot?.custoRacaoBezerro||0,comprovante:compraComp})})
-                      if(!r.error){setCompraStep(3);sounds.coin();api('/api/solicitacoes').then(setSolic)}
+                      if(!r.error){setCompraStep(3);sounds.coin();api('/api/solicitacoes').then(d=>setSolic(safeArr(d)))}
                       else notify('Erro: '+r.error,'danger')
                     }} T={T} style={{flex:2,padding:12}}>Enviar solicitação</Btn>
                   </div>
@@ -987,7 +988,7 @@ export default function App() {
                         <div style={{fontSize:16,fontWeight:700,color:T.gold,fontFamily:"'Playfair Display',serif"}}>${fmt((mercado?.precos?.abate||0)*l.quantidade)}</div>
                       </div>
                       <div style={{marginLeft:'auto'}}>
-                        {l.fase==='abatido'&&l.status==='ativo'?<Btn T={T} onClick={async()=>{const r=await api(`/api/lotes/${l.id}`,{method:'PATCH',body:JSON.stringify({action:'solicitar_abate',preco_kg:mercado?.precos?.precoKg||3})});if(!r.error){sounds.coin();notify('Abate solicitado!');api('/api/lotes').then(setLotes)}}}>🥩 Solicitar abate</Btn>
+                        {l.fase==='abatido'&&l.status==='ativo'?<Btn T={T} onClick={async()=>{const r=await api(`/api/lotes/${l.id}`,{method:'PATCH',body:JSON.stringify({action:'solicitar_abate',preco_kg:mercado?.precos?.precoKg||3})});if(!r.error){sounds.coin();notify('Abate solicitado!');api('/api/lotes').then(d=>setLotes(safeArr(d)))}}}>🥩 Solicitar abate</Btn>
                         :l.status==='aguardando_pagamento'?<Badge type="amber">⏳ Aguard. addmoney</Badge>
                         :l.status==='pago'?<Badge type="ok">✓ Pago!</Badge>
                         :l.fase!=='abatido'&&l.status==='ativo'?<Btn T={T} v="ghost" onClick={()=>{setNAnuncio(f=>({...f,lote_id:l.id}));changePage('venda')}} style={{fontSize:12}}>Anunciar</Btn>:'—'}
@@ -1034,7 +1035,7 @@ export default function App() {
                   sounds.success()
                   notify(`✓ Lote dividido — ${dividirLote.codigo}-A e ${dividirLote.codigo}-B criados!`)
                   setDividirLote(null)
-                  api('/api/lotes').then(setLotes)
+                  api('/api/lotes').then(d=>setLotes(safeArr(d)))
                 }} style={{flex:2}} disabled={!dividirQtd||parseInt(dividirQtd)<=0||parseInt(dividirQtd)>=dividirLote.quantidade}>✂ Dividir</Btn>
               </div>
             </div>
@@ -1053,7 +1054,7 @@ export default function App() {
                   a.obs?<span style={{fontSize:11,color:T.textMuted}}>{a.obs}</span>:'',
                   <div style={{display:'flex',flexDirection:'column',gap:4}}>
                     <Btn T={T} v="amber" style={{padding:'6px 12px',fontSize:12}} onClick={()=>{sounds.click();setChatAnuncio(a)}}>💬 Negociar</Btn>
-                    {String(a.vendedor_id)===String(user?.id)&&a.fase==='garrote'&&<BotaoOfertaNPC anuncio={a} T={T} api={api} notify={notify} sounds={sounds} onVendido={()=>{api('/api/anuncios').then(setAnuncios);api('/api/lotes').then(setLotes)}}/>}
+                    {String(a.vendedor_id)===String(user?.id)&&a.fase==='garrote'&&<BotaoOfertaNPC anuncio={a} T={T} api={api} notify={notify} sounds={sounds} onVendido={()=>{api('/api/anuncios').then(d=>setAnuncios(safeArr(d)));api('/api/lotes').then(d=>setLotes(safeArr(d)))}}/>}
                   </div>
                 ])}/>
             </Card>
@@ -1068,7 +1069,7 @@ export default function App() {
                   <Inp T={T} label="Preço pedido ($)" type="number" value={nAnuncio.preco_pedido} onChange={e=>setNAnuncio(f=>({...f,preco_pedido:e.target.value}))} placeholder="1800"/>
                   <Inp T={T} label="Observação" value={nAnuncio.obs} onChange={e=>setNAnuncio(f=>({...f,obs:e.target.value}))} placeholder="Negociável..."/>
                 </div>
-                <Btn T={T} onClick={async()=>{const l=lotes.find(x=>x.id===nAnuncio.lote_id);if(!l) return notify('Selecione um lote','danger');const r=await api('/api/anuncios',{method:'POST',body:JSON.stringify({...nAnuncio,lote_codigo:l.codigo,fase:l.fase,quantidade:l.quantidade,peso_kg:l.peso_kg})});if(!r.error){notify('✓ Anúncio publicado!');api('/api/anuncios').then(setAnuncios)}}}>Publicar anúncio</Btn>
+                <Btn T={T} onClick={async()=>{const l=lotes.find(x=>x.id===nAnuncio.lote_id);if(!l) return notify('Selecione um lote','danger');const r=await api('/api/anuncios',{method:'POST',body:JSON.stringify({...nAnuncio,lote_codigo:l.codigo,fase:l.fase,quantidade:l.quantidade,peso_kg:l.peso_kg})});if(!r.error){notify('✓ Anúncio publicado!');api('/api/anuncios').then(d=>setAnuncios(safeArr(d)))}}}>Publicar anúncio</Btn>
               </Card>
               {user?.role==='admin'&&<Card T={T} hover={false}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:T.text,marginBottom:14}}>Registrar venda <Badge type="amber">Admin</Badge></div>
@@ -1404,8 +1405,8 @@ export default function App() {
                   <span style={{fontWeight:600}}>{s.jogador_nome}</span>,`${s.quantidade} cab.`,
                   <span style={{color:T.gold,fontWeight:700,fontFamily:"'Playfair Display',serif"}}>${fmt(s.valor_total)}</span>,
                   <a href={s.comprovante} target="_blank" rel="noreferrer" style={{color:'#4a90d0',fontSize:12}}>Ver →</a>,
-                  <Btn T={T} onClick={async()=>{const r=await api('/api/solicitacoes',{method:'PATCH',body:JSON.stringify({id:s.id,status:'aprovado'})});if(r.error){notify('Erro: '+r.error,'danger')}else{sounds.coin();notify('✓ Aprovado! Lote '+r.codigo+' criado.');api('/api/solicitacoes').then(setSolic);api('/api/lotes').then(setLotes)}}} style={{padding:'5px 12px',fontSize:11}}>✓ Aprovar</Btn>,
-                  <Btn T={T} v="danger" onClick={async()=>{await api('/api/solicitacoes',{method:'PATCH',body:JSON.stringify({id:s.id,status:'recusado'})});notify('Recusado.','danger');api('/api/solicitacoes').then(setSolic)}} style={{padding:'5px 12px',fontSize:11}}>✗</Btn>
+                  <Btn T={T} onClick={async()=>{const r=await api('/api/solicitacoes',{method:'PATCH',body:JSON.stringify({id:s.id,status:'aprovado'})});if(r.error){notify('Erro: '+r.error,'danger')}else{sounds.coin();notify('✓ Aprovado! Lote '+r.codigo+' criado.');api('/api/solicitacoes').then(d=>setSolic(safeArr(d)));api('/api/lotes').then(d=>setLotes(safeArr(d)))}}} style={{padding:'5px 12px',fontSize:11}}>✓ Aprovar</Btn>,
+                  <Btn T={T} v="danger" onClick={async()=>{await api('/api/solicitacoes',{method:'PATCH',body:JSON.stringify({id:s.id,status:'recusado'})});notify('Recusado.','danger');api('/api/solicitacoes').then(d=>setSolic(safeArr(d)))}} style={{padding:'5px 12px',fontSize:11}}>✗</Btn>
                 ])}/>
             </Card>
 
@@ -1451,7 +1452,7 @@ export default function App() {
                   <CountdownRing dataFase={l.data_fase4} T={T} size={36}/>,
                   <Badge type={l.status==='ativo'?'gray':l.status==='aguardando_pagamento'?'amber':l.status==='em_transito'?'info':'ok'}>{l.status==='ativo'?'Ativo':l.status==='aguardando_pagamento'?'Aguard.':l.status==='em_transito'?'🚛 A caminho':'✓ Pago'}</Badge>,
                   l.fase!=='abatido'&&l.status==='ativo'?<Btn T={T} v="ghost" onClick={async()=>{const r=await api(`/api/lotes/${l.id}`,{method:'PATCH',body:JSON.stringify({action:'avancar_fase'})});if(!r.error){sounds.phase();notify('Fase avançada!');reload()}}} style={{padding:'5px 10px',fontSize:11}}>Avançar</Btn>:'—',
-                  <Btn T={T} v="danger" onClick={async()=>{await api('/api/admin/reset',{method:'POST',body:JSON.stringify({tipo:'lote',lote_id:l.id})});notify('Lote removido.');api('/api/lotes').then(setLotes)}} style={{padding:'4px 8px',fontSize:11}}>✕</Btn>
+                  <Btn T={T} v="danger" onClick={async()=>{await api('/api/admin/reset',{method:'POST',body:JSON.stringify({tipo:'lote',lote_id:l.id})});notify('Lote removido.');api('/api/lotes').then(d=>setLotes(safeArr(d)))}} style={{padding:'4px 8px',fontSize:11}}>✕</Btn>
                 ])}/>
             </Card>
 
@@ -1474,8 +1475,8 @@ export default function App() {
                 :<Tbl T={T} headers={['Usuário','Fazenda','','']}
                   rows={usersPend.map(u=>[
                     <span style={{fontWeight:600}}>{u.username}</span>,u.fazenda||'—',
-                    <Btn T={T} onClick={async()=>{await api('/api/admin/usuarios',{method:'PATCH',body:JSON.stringify({id:u.id,status:'aprovado'})});sounds.success();notify('✓ Aprovado!');api('/api/admin/usuarios').then(setUsers)}} style={{padding:'5px 10px',fontSize:11}}>✓</Btn>,
-                    <Btn T={T} v="danger" onClick={async()=>{await api('/api/admin/usuarios',{method:'PATCH',body:JSON.stringify({id:u.id,status:'recusado'})});api('/api/admin/usuarios').then(setUsers)}} style={{padding:'5px 10px',fontSize:11}}>✗</Btn>
+                    <Btn T={T} onClick={async()=>{await api('/api/admin/usuarios',{method:'PATCH',body:JSON.stringify({id:u.id,status:'aprovado'})});sounds.success();notify('✓ Aprovado!');api('/api/admin/usuarios').then(d=>setUsers(safeArr(d)))}} style={{padding:'5px 10px',fontSize:11}}>✓</Btn>,
+                    <Btn T={T} v="danger" onClick={async()=>{await api('/api/admin/usuarios',{method:'PATCH',body:JSON.stringify({id:u.id,status:'recusado'})});api('/api/admin/usuarios').then(d=>setUsers(safeArr(d)))}} style={{padding:'5px 10px',fontSize:11}}>✗</Btn>
                   ])}/>}
               </Card>
             </div>
@@ -1486,14 +1487,14 @@ export default function App() {
                 <div style={{flex:1,minWidth:130}}><Inp T={T} label="Usuário" value={nUser.username} onChange={e=>setNUser(f=>({...f,username:e.target.value}))} placeholder="nome_jogador"/></div>
                 <div style={{flex:1,minWidth:110}}><Inp T={T} label="Senha" type="password" value={nUser.password} onChange={e=>setNUser(f=>({...f,password:e.target.value}))} placeholder="senha123"/></div>
                 <div style={{flex:1,minWidth:90}}><Inp T={T} label="Fazenda" value={nUser.fazenda} onChange={e=>setNUser(f=>({...f,fazenda:e.target.value}))} placeholder="0325"/></div>
-                <Btn T={T} onClick={async()=>{const r=await api('/api/admin/usuarios',{method:'POST',body:JSON.stringify(nUser)});if(!r.error){sounds.success();notify('✓ Criado!');api('/api/admin/usuarios').then(setUsers)}}}>Criar</Btn>
+                <Btn T={T} onClick={async()=>{const r=await api('/api/admin/usuarios',{method:'POST',body:JSON.stringify(nUser)});if(!r.error){sounds.success();notify('✓ Criado!');api('/api/admin/usuarios').then(d=>setUsers(safeArr(d)))}}}>Criar</Btn>
               </div>
               <Tbl T={T} headers={['Usuário','Fazenda','Status','Editar','']}
                 rows={users.filter(u=>u.status!=='pendente').map(u=>[
                   <span style={{fontWeight:600}}>{u.username}</span>,u.fazenda||'—',
                   <Badge type={u.status==='aprovado'||u.role==='admin'?'ok':'danger'}>{u.role==='admin'?'admin':u.status||'aprovado'}</Badge>,
                   <div style={{display:'flex',gap:4}}>{u.role!=='admin'?<Btn T={T} v="ghost" onClick={()=>{setEditTarget(u);setEditPerfil({fazenda:u.fazenda||'',foto_url:u.foto_url||'',bio:u.bio||'',nova_senha:''})}} style={{padding:'4px 8px',fontSize:11}}>✏ Editar</Btn>:''}<Btn T={T} v="ghost" onClick={()=>{setViewProfile(u.username);setProfileData({...u,stats:{total_abates:0,total_cabecas:0,total_ganho:0}})}} style={{padding:'4px 8px',fontSize:11}}>👤</Btn></div>,
-                  u.role!=='admin'?<Btn T={T} v="danger" onClick={async()=>{await api('/api/admin/usuarios',{method:'DELETE',body:JSON.stringify({id:u.id})});api('/api/admin/usuarios').then(setUsers)}} style={{padding:'4px 8px',fontSize:11}}>✕</Btn>:'—'
+                  u.role!=='admin'?<Btn T={T} v="danger" onClick={async()=>{await api('/api/admin/usuarios',{method:'DELETE',body:JSON.stringify({id:u.id})});api('/api/admin/usuarios').then(d=>setUsers(safeArr(d)))}} style={{padding:'4px 8px',fontSize:11}}>✕</Btn>:'—'
                 ])}/>
             </Card>
 
