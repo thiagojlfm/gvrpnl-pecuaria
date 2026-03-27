@@ -33,148 +33,144 @@ const sounds = {
   error: () => playTone(200, 0.3, 'sawtooth', 0.06),
 }
 
-// ─── CSS Globals ──────────────────────────────────────────────────────────────
+// ─── CSS Globals — Terminal Brutalista ────────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+  :root{
+    --bg:#0B0E14;--panel:#0F1218;--card:#15181E;--card2:#1C2028;--input-bg:#0d1017;
+    --border:#2A2F3A;--border2:#3A4050;
+    --rust:#C84B31;--rust2:#8A3020;--rust3:#3A1408;
+    --grn:#00E054;--grn2:#004D1C;
+    --red:#FF3333;--red2:#5A0A0A;
+    --ice:#C8D0D8;--ice2:#7A8490;--ice3:#3A4048;
+    --font-disp:'Bebas Neue',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{font-family:'DM Sans',sans-serif;background:#1a0f00}
-  ::-webkit-scrollbar{width:4px}
-  ::-webkit-scrollbar-track{background:transparent}
-  ::-webkit-scrollbar-thumb{background:#5a3a1a;border-radius:2px}
-  @keyframes fadeSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  body{font-family:var(--font-mono);background:var(--bg);color:var(--ice);-webkit-font-smoothing:antialiased}
+  ::-webkit-scrollbar{width:4px;height:4px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:0}
+  ::-webkit-scrollbar-thumb:hover{background:var(--rust2)}
+  @keyframes fadeSlideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
   @keyframes countSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
   @keyframes slideRight{from{transform:translateX(-100%)}to{transform:translateX(0)}}
   @keyframes slideLeft{from{transform:translateX(0)}to{transform:translateX(-100%)}}
-  .page-enter{animation:fadeSlideIn .35s cubic-bezier(.4,0,.2,1) both}
-  .card-hover{transition:transform .2s ease,box-shadow .2s ease}
-  .card-hover:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(200,146,42,.2)!important}
-  .btn-hover{transition:all .15s ease}
-  .btn-hover:hover{filter:brightness(1.1);transform:translateY(-1px)}
-  .btn-hover:active{transform:translateY(0)}
+  @keyframes barGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  @keyframes blinkDot{0%,100%{opacity:1}50%{opacity:0}}
+  .page-enter{animation:fadeSlideIn .3s cubic-bezier(.4,0,.2,1) both}
+  .card-hover{transition:border-color .15s}
+  .btn-hover{transition:none}
   .drawer-open{animation:slideRight .28s cubic-bezier(.4,0,.2,1) both}
-  @media(max-width:768px){
-    .desktop-only{display:none!important}
-    .mobile-header{display:flex!important}
-  }
-  @media(min-width:769px){
-    .mobile-only{display:none!important}
-    .mobile-header{display:none!important}
-  }
+  @media(max-width:768px){.desktop-only{display:none!important}.mobile-header{display:flex!important}}
+  @media(min-width:769px){.mobile-only{display:none!important}.mobile-header{display:none!important}}
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 `
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
+// ─── Theme — mapeado para CSS vars (mantém compatibilidade com T.xxx) ─────────
 const D = {
-  // Dark: Rural Premium
-  bg:'#120a00', panel:'#1e1208', card:'#241608', cardHover:'#2a1c0a',
-  border:'#3a2510', border2:'#5a3a18', gold:'#c8922a', goldLight:'#e8b84a',
-  goldDark:'#8a5e10', cream:'#f0ddb0', creamDim:'#b09870', creamMuted:'#7a6040',
-  green:'#6a9a30', greenDark:'#4a7a1e', red:'#c84040', amber:'#d08020',
-  inputBg:'#1a0f04', navBg:'#160c02', isDark:true,
-  text:'#f0ddb0', textDim:'#b09870', textMuted:'#7a6040',
+  bg:'#0B0E14', panel:'#0F1218', card:'#15181E', cardHover:'#1C2028',
+  border:'#2A2F3A', border2:'#3A4050',
+  gold:'#C84B31', goldLight:'#e86050', goldDark:'#8A3020',
+  cream:'#C8D0D8', creamDim:'#7A8490', creamMuted:'#3A4048',
+  green:'#00E054', greenDark:'#004D1C', red:'#FF3333', amber:'#C84B31',
+  inputBg:'#0d1017', navBg:'#0F1218', isDark:true,
+  text:'#C8D0D8', textDim:'#7A8490', textMuted:'#3A4048',
 }
 const L = {
-  // Light: Rural Day
-  bg:'#faf5e8', panel:'#fff8ea', card:'#ffffff', cardHover:'#fffbf0',
-  border:'#e0cc9a', border2:'#c8aa68', gold:'#8a5e10', goldLight:'#a07828',
-  goldDark:'#6a4808', cream:'#3d1f0a', creamDim:'#6a4020', creamMuted:'#9a7050',
-  green:'#3a6010', greenDark:'#2a4808', red:'#a02020', amber:'#a06010',
-  inputBg:'#fdf8ee', navBg:'#f5e8c8', isDark:false,
-  text:'#3d1f0a', textDim:'#6a4020', textMuted:'#9a7050',
+  bg:'#0B0E14', panel:'#0F1218', card:'#15181E', cardHover:'#1C2028',
+  border:'#2A2F3A', border2:'#3A4050',
+  gold:'#C84B31', goldLight:'#e86050', goldDark:'#8A3020',
+  cream:'#C8D0D8', creamDim:'#7A8490', creamMuted:'#3A4048',
+  green:'#00E054', greenDark:'#004D1C', red:'#FF3333', amber:'#C84B31',
+  inputBg:'#0d1017', navBg:'#0F1218', isDark:true,
+  text:'#C8D0D8', textDim:'#7A8490', textMuted:'#3A4048',
 }
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 function Badge({type, children}) {
-  const s = {
-    ok:['#0a2a1a','#4ad4a0','#1a6a4a'], warn:['#3a2a00','#c8922a','#6a5010'],
-    info:['#0a0a30','#7060f0','#2010a0'], gray:['#2a2018','#9a8060','#4a3020'],
-    purple:['#100a30','#9060e0','#3020a0'], danger:['#3a0808','#e06060','#6a1818'],
-    amber:['#3a2000','#d08020','#6a3800'], gold:['#1a0a30','#a080ff','#5030c0'],
-    nl:['#0a0818','linear-gradient(135deg,#4060d0,#8040c0)','#3020a0'],
-  }[type]||['#2a2018','#9a8060','#4a3020']
-  return <span style={{background:s[0],color:s[1],border:`1px solid ${s[2]}`,fontSize:10,padding:'2px 8px',borderRadius:20,fontWeight:600,whiteSpace:'nowrap',display:'inline-block',letterSpacing:'.4px'}}>{children}</span>
+  const map={ok:{bg:'#00200E',color:'#00E054',border:'#004D1C'},warn:{bg:'#2A1408',color:'#C84B31',border:'#8A3020'},info:{bg:'#0A0F1E',color:'#5A90D0',border:'#1A3060'},gray:{bg:'#1C2028',color:'#7A8490',border:'#3A4048'},purple:{bg:'#150A28',color:'#9060E0',border:'#3A2060'},danger:{bg:'#2A0808',color:'#FF3333',border:'#5A0A0A'},amber:{bg:'#1E1008',color:'#C84B31',border:'#8A3020'},gold:{bg:'#1C2028',color:'#C8D0D8',border:'#3A4048'},nl:{bg:'#0A0F1E',color:'#5A90D0',border:'#1A3060'}}
+  const s=map[type]||map.gray
+  return <span style={{background:s.bg,color:s.color,border:`1px solid ${s.border}`,fontSize:10,padding:'2px 8px',borderRadius:2,fontWeight:700,whiteSpace:'nowrap',display:'inline-block',letterSpacing:'2px',fontFamily:'var(--font-mono)',textTransform:'uppercase'}}>{children}</span>
 }
 
 function Card({children, style, glow, hover=true, T}) {
-  return <div className={hover?'card-hover':''} style={{background:T.card,border:`1px solid ${glow?T.border2:T.border}`,borderRadius:16,padding:20,marginBottom:16,boxShadow:glow?`0 0 30px rgba(200,146,42,.12),0 2px 12px rgba(0,0,0,.3)`:'0 2px 12px rgba(0,0,0,.15)',position:'relative',overflow:'hidden',...style}}>
-    {glow&&<div style={{position:'absolute',top:0,left:0,right:0,height:1,background:`linear-gradient(90deg,transparent,${T.gold},transparent)`,opacity:.4}}/>}
+  return <div className={hover?'card-hover':''} style={{background:'var(--card)',border:`1px solid ${glow?'var(--rust2)':'var(--border)'}`,borderLeft:glow?'3px solid var(--rust)':'1px solid var(--border)',borderRadius:0,padding:20,marginBottom:16,position:'relative',overflow:'hidden',clipPath:glow?'polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,0 100%)':'none',...style}} onMouseEnter={hover?e=>{e.currentTarget.style.borderColor='var(--rust2)'}:undefined} onMouseLeave={hover?e=>{e.currentTarget.style.borderColor=glow?'var(--rust2)':'var(--border)'}:undefined}>
+    {glow&&<div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'var(--rust)',opacity:.6}}/>}
     {children}
   </div>
 }
 
 function SectionTitle({icon, title, sub, T}) {
-  return <div style={{marginBottom:28,paddingBottom:16,borderBottom:`1px solid ${T.border}`}}>
-    <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:4}}>
-      <span style={{fontSize:24}}>{icon}</span>
-      <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:700,color:T.text,letterSpacing:'-.3px'}}>{title}</h1>
+  return <div style={{marginBottom:24,paddingBottom:14,borderBottom:'1px solid var(--border)'}}>
+    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+      <span style={{fontSize:18}}>{icon}</span>
+      <h1 style={{fontFamily:'var(--font-disp)',fontSize:28,letterSpacing:'3px',color:'var(--ice)',fontWeight:400,lineHeight:1}}>{String(title).toUpperCase()}</h1>
     </div>
-    {sub&&<p style={{fontSize:13,color:T.textMuted,marginLeft:36}}>{sub}</p>}
+    {sub&&<p style={{fontSize:11,color:'var(--ice3)',marginLeft:28,letterSpacing:'1px',fontWeight:300,fontFamily:'var(--font-mono)'}}>// {sub}</p>}
   </div>
 }
 
 function Metric({label, value, sub, color, T, icon}) {
-  return <div style={{background:T.inputBg,borderRadius:12,padding:'16px 18px',border:`1px solid ${T.border}`,position:'relative',overflow:'hidden'}}>
-    <div style={{position:'absolute',top:10,right:12,fontSize:20,opacity:.15}}>{icon}</div>
-    <div style={{fontSize:10,color:T.textMuted,marginBottom:8,textTransform:'uppercase',letterSpacing:'1px',fontWeight:600}}>{label}</div>
-    <div style={{fontSize:24,fontWeight:700,color:color||T.text,fontFamily:"'Playfair Display',serif"}}>{value}</div>
-    {sub&&<div style={{fontSize:11,color:T.textMuted,marginTop:4}}>{sub}</div>}
+  return <div style={{background:'var(--input-bg)',border:'1px solid var(--border)',borderTop:`2px solid ${color||'var(--border2)'}`,borderRadius:0,padding:'14px 16px',position:'relative',overflow:'hidden'}}>
+    <div style={{fontSize:9,color:'var(--ice3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'3px',fontWeight:400,fontFamily:'var(--font-mono)'}}>{label}</div>
+    <div style={{fontSize:26,fontWeight:700,color:color||'var(--ice)',fontFamily:'var(--font-disp)',letterSpacing:'1px',lineHeight:1}}>{value}</div>
+    {sub&&<div style={{fontSize:10,color:'var(--ice3)',marginTop:4,fontWeight:300,letterSpacing:'1px'}}>{sub}</div>}
   </div>
 }
 
 function Inp({label, T, hint, ...props}) {
   return <div style={{display:'flex',flexDirection:'column',gap:6}}>
-    {label&&<label style={{fontSize:11,color:T.textMuted,fontWeight:600,textTransform:'uppercase',letterSpacing:'.8px'}}>{label}</label>}
-    <input {...props} style={{background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:10,padding:'10px 14px',fontSize:13,color:T.text,fontFamily:"'DM Sans',sans-serif",outline:'none',transition:'border-color .15s',...props.style}} onFocus={e=>{e.target.style.borderColor=T.gold;props.onFocus&&props.onFocus(e)}} onBlur={e=>{e.target.style.borderColor=T.border2;props.onBlur&&props.onBlur(e)}}/>
-    {hint&&<div style={{fontSize:11,color:T.textMuted}}>{hint}</div>}
+    {label&&<label style={{fontSize:10,color:'var(--ice3)',fontWeight:400,textTransform:'uppercase',letterSpacing:'3px',fontFamily:'var(--font-mono)'}}>{label}</label>}
+    <input {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:0,padding:'10px 14px',fontSize:13,color:'var(--ice)',fontFamily:'var(--font-mono)',outline:'none',transition:'border-color .1s',...props.style}} onFocus={e=>{e.target.style.borderColor='var(--rust)';props.onFocus&&props.onFocus(e)}} onBlur={e=>{e.target.style.borderColor='var(--border2)';props.onBlur&&props.onBlur(e)}}/>
+    {hint&&<div style={{fontSize:10,color:'var(--ice3)',letterSpacing:'1px',fontWeight:300}}>{hint}</div>}
   </div>
 }
 
 function Sel({label, children, T, ...props}) {
   return <div style={{display:'flex',flexDirection:'column',gap:6}}>
-    {label&&<label style={{fontSize:11,color:T.textMuted,fontWeight:600,textTransform:'uppercase',letterSpacing:'.8px'}}>{label}</label>}
-    <select {...props} style={{background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:10,padding:'10px 14px',fontSize:13,color:T.text,fontFamily:"'DM Sans',sans-serif",outline:'none'}}>{children}</select>
+    {label&&<label style={{fontSize:10,color:'var(--ice3)',fontWeight:400,textTransform:'uppercase',letterSpacing:'3px',fontFamily:'var(--font-mono)'}}>{label}</label>}
+    <select {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:0,padding:'10px 14px',fontSize:13,color:'var(--ice)',fontFamily:'var(--font-mono)',outline:'none',cursor:'pointer',...props.style}}>{children}</select>
   </div>
 }
 
 function Btn({children, onClick, v='primary', style, disabled, T, sound=true}) {
-  const C = T||D
-  const vars = {
-    primary:{background:`linear-gradient(135deg,${C.goldDark},${C.gold})`,color:'#fff',boxShadow:`0 4px 16px rgba(200,146,42,.35)`},
-    ghost:{background:'transparent',border:`1px solid ${C.border2}`,color:C.textDim},
-    danger:{background:'#3a0808',color:'#e06060',border:'1px solid #6a1818'},
-    amber:{background:'#3a2000',color:'#d08020',border:'1px solid #6a3800'},
-    purple:{background:'#1a1030',color:'#a080e0',border:'1px solid #3a2060'},
-    red:{background:'#3a0808',color:'#e06060',border:'1px solid #6a1818'},
-    green:{background:`linear-gradient(135deg,${C.greenDark},${C.green})`,color:'#fff',boxShadow:'0 4px 16px rgba(74,122,30,.3)'},
+  const vmap={
+    primary:{bg:'transparent',border:'2px solid var(--ice3)',color:'var(--ice)',hbg:'var(--ice3)',hc:'var(--bg)'},
+    ghost:{bg:'transparent',border:'1px solid var(--border2)',color:'var(--ice2)',hbg:'var(--border2)',hc:'var(--bg)'},
+    danger:{bg:'var(--red2)',border:'2px solid var(--red)',color:'var(--red)',hbg:'var(--red)',hc:'#fff',shadow:'inset 0 -3px 0 rgba(0,0,0,.5)'},
+    amber:{bg:'var(--rust3)',border:'1px solid var(--rust2)',color:'var(--rust)',hbg:'var(--rust2)',hc:'#fff'},
+    purple:{bg:'#150a28',border:'1px solid #3a2060',color:'#9060e0',hbg:'#3a2060',hc:'#fff'},
+    red:{bg:'var(--red2)',border:'2px solid var(--red)',color:'var(--red)',hbg:'var(--red)',hc:'#fff',shadow:'inset 0 -3px 0 rgba(0,0,0,.5)'},
+    green:{bg:'var(--grn2)',border:'2px solid var(--grn)',color:'var(--grn)',hbg:'var(--grn)',hc:'#000'},
   }
-  return <button className="btn-hover" style={{border:'none',borderRadius:10,fontSize:13,fontWeight:600,cursor:disabled?'not-allowed':'pointer',padding:'10px 20px',fontFamily:"'DM Sans',sans-serif",opacity:disabled?.5:1,...vars[v],...style}} onClick={()=>{if(sound&&!disabled) sounds.click();onClick&&onClick()}} disabled={disabled}>{children}</button>
+  const c=vmap[v]||vmap.primary
+  return <button style={{background:c.bg,border:c.border,color:c.color,borderRadius:0,fontSize:13,fontWeight:700,cursor:disabled?'not-allowed':'pointer',padding:'10px 20px',fontFamily:'var(--font-disp)',letterSpacing:'3px',textTransform:'uppercase',opacity:disabled?.4:1,boxShadow:c.shadow||'none',outline:'none',...style}} onClick={()=>{if(sound&&!disabled) sounds.click();onClick&&onClick()}} disabled={disabled} onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background=c.hbg;e.currentTarget.style.color=c.hc}}} onMouseLeave={e=>{e.currentTarget.style.background=c.bg;e.currentTarget.style.color=c.color}} onMouseDown={e=>{if(!disabled)e.currentTarget.style.transform='translate(2px,2px)'}} onMouseUp={e=>{e.currentTarget.style.transform='none'}}>{children}</button>
 }
 
 function Tbl({headers, rows, T}) {
-  return <div style={{overflowX:'auto',borderRadius:12,border:`1px solid ${T.border}`}}>
-    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-      <thead style={{background:T.inputBg}}>
-        <tr>{headers.map((h,i)=><th key={i} style={{textAlign:'left',padding:'10px 14px',fontSize:10,fontWeight:600,color:T.textMuted,borderBottom:`1px solid ${T.border}`,whiteSpace:'nowrap',textTransform:'uppercase',letterSpacing:'.8px'}}>{h}</th>)}</tr>
-      </thead>
+  return <div style={{overflowX:'auto',border:'1px solid var(--border)',borderRadius:0,backgroundImage:'linear-gradient(rgba(58,64,72,.25) 1px,transparent 1px),linear-gradient(90deg,rgba(58,64,72,.25) 1px,transparent 1px)',backgroundSize:'24px 24px'}}>
+    <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+      <thead><tr style={{background:'var(--card2)'}}>{headers.map((h,i)=><th key={i} style={{textAlign:'left',padding:'10px 14px',fontSize:9,fontWeight:400,color:'var(--ice3)',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap',textTransform:'uppercase',letterSpacing:'3px',fontFamily:'var(--font-mono)'}}>{h}</th>)}</tr></thead>
       <tbody>
-        {rows.map((row,i)=><tr key={i} style={{borderBottom:`1px solid ${T.border}`,transition:'background .15s'}} onMouseEnter={e=>e.currentTarget.style.background=T.inputBg} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-          {row.map((cell,j)=><td key={j} style={{padding:'11px 14px',color:T.text,verticalAlign:'middle'}}>{cell}</td>)}
+        {rows.map((row,i)=><tr key={i} style={{borderBottom:'1px solid var(--border)',transition:'background .1s'}} onMouseEnter={e=>e.currentTarget.style.background='var(--input-bg)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+          {row.map((cell,j)=><td key={j} style={{padding:'11px 14px',color:'var(--ice)',verticalAlign:'middle',fontFamily:'var(--font-mono)',fontSize:12}}>{cell}</td>)}
         </tr>)}
-        {rows.length===0&&<tr><td colSpan={headers.length} style={{padding:32,textAlign:'center',color:T.textMuted,fontSize:13}}>Nenhum registro encontrado</td></tr>}
+        {rows.length===0&&<tr><td colSpan={headers.length} style={{padding:32,textAlign:'center',color:'var(--ice3)',fontSize:12,letterSpacing:'2px',fontFamily:'var(--font-mono)'}}>// Nenhum registro encontrado</td></tr>}
       </tbody>
     </table>
   </div>
 }
 
 function Alrt({type, children}) {
-  const s = {warn:['#2a1800','#c8922a','#6a4010'],success:['#0a2008','#6a9a30','#2a5010'],info:['#050f28','#4a80d0','#103060'],danger:['#280606','#e06060','#601818']}[type]||['#1a1008','#9a8060','#4a3020']
-  return <div style={{background:s[0],color:s[1],borderLeft:`3px solid ${s[2]}`,padding:'12px 16px',borderRadius:10,fontSize:13,marginBottom:14,lineHeight:1.6}}>{children}</div>
+  const s={warn:{bg:'#1E0E04',color:'#C84B31',border:'#8A3020'},success:{bg:'#002410',color:'#00E054',border:'#004D1C'},info:{bg:'#050F28',color:'#5A90D0',border:'#103060'},danger:{bg:'#2A0808',color:'#FF3333',border:'#5A0A0A'}}[type]||{bg:'#1C2028',color:'#7A8490',border:'#3A4048'}
+  return <div style={{background:s.bg,color:s.color,borderLeft:`3px solid ${s.border}`,padding:'10px 14px',borderRadius:0,fontSize:12,marginBottom:14,lineHeight:1.6,fontFamily:'var(--font-mono)',letterSpacing:'.5px'}}>{children}</div>
 }
-
 function faseBadge(f) {
   const m={bezerro:'info',garrote:'warn',boi:'gray',abatido:'gold'}
   return <Badge type={m[f]||'gray'}>{FASES[f]} · S{SEMANAS[f]}</Badge>
@@ -764,47 +760,130 @@ export default function App() {
 
           {/* MERCADO */}
           {page==='mercado'&&<>
-            <SectionTitle T={T} icon="📈" title="Mercado" sub="Preços em tempo real baseados no rebanho ativo do servidor"/>
-            <div style={{...gs(160),marginBottom:20}}>
-              {['bezerro','garrote','boi','abatido'].map(f=><AnimalCard key={f} fase={f} mercado={mercado} T={T}/>)}
+            {/* Ticker ao vivo */}
+            <div style={{background:'#0d1017',borderBottom:'2px solid #8A3020',height:28,display:'flex',alignItems:'center',overflow:'hidden',marginBottom:20,marginLeft:-20,marginRight:-20}}>
+              <div style={{background:'var(--rust)',color:'#fff',fontFamily:'var(--font-disp)',fontSize:12,letterSpacing:3,padding:'0 14px',height:'100%',display:'flex',alignItems:'center',flexShrink:0,borderRight:'2px solid #8A3020'}}>PREGAO AO VIVO</div>
+              <div style={{overflow:'hidden',flex:1}}>
+                <div style={{display:'flex',animation:'tickerScroll 30s linear infinite'}}>
+                  {[
+                    {sym:'BZR',val:`$${fmt(mercado?.precos?.bezerro||800)}`,chg:'GOV.NPC',c:'#7A8490'},
+                    {sym:'GRR',val:`$${fmt(mercado?.precos?.garrote||0)}`,chg:mercado?.precos?.garrote?`+${((mercado.precos.garrote/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:'—',c:'#00E054'},
+                    {sym:'BOI',val:`$${fmt(mercado?.precos?.boi||0)}`,chg:mercado?.precos?.boi?`+${((mercado.precos.boi/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:'—',c:'#00E054'},
+                    {sym:'FGR',val:`$${fmt(mercado?.precos?.abate||0)}`,chg:mercado?.precos?.abate?`+${((mercado.precos.abate/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:'—',c:'#00E054'},
+                    {sym:'RCO',val:`$${mercado?.precos?.precoRacao||2}/KG`,chg:mercado?.precos?.precoRacao>2?'ALTA':'NORMAL',c:mercado?.precos?.precoRacao>2?'#FF3333':'#00E054'},
+                    {sym:'REB',val:`${mercado?.rebanho?.total||0} CAB`,chg:'ATIVO',c:'#7A8490'},
+                    {sym:'MRG',val:`${mercado?.margem||'~30'}%`,chg:'BZR-FGR',c:'#00E054'},
+                  ].concat([
+                    {sym:'BZR',val:`$${fmt(mercado?.precos?.bezerro||800)}`,chg:'GOV.NPC',c:'#7A8490'},
+                    {sym:'GRR',val:`$${fmt(mercado?.precos?.garrote||0)}`,chg:'—',c:'#00E054'},
+                    {sym:'BOI',val:`$${fmt(mercado?.precos?.boi||0)}`,chg:'—',c:'#00E054'},
+                    {sym:'FGR',val:`$${fmt(mercado?.precos?.abate||0)}`,chg:'—',c:'#00E054'},
+                    {sym:'RCO',val:`$${mercado?.precos?.precoRacao||2}/KG`,chg:'',c:'#7A8490'},
+                    {sym:'REB',val:`${mercado?.rebanho?.total||0} CAB`,chg:'ATIVO',c:'#7A8490'},
+                    {sym:'MRG',val:`${mercado?.margem||'~30'}%`,chg:'BZR-FGR',c:'#00E054'},
+                  ]).map((it,i)=>(
+                    <span key={i} style={{fontSize:11,padding:'0 22px',display:'flex',gap:8,alignItems:'center',borderRight:'1px solid #3A4048',fontFamily:'var(--font-mono)',whiteSpace:'nowrap'}}>
+                      <span style={{color:'#3A4048',fontWeight:300,fontSize:10}}>{it.sym}</span>
+                      <span style={{fontWeight:700,letterSpacing:1,color:'var(--ice)'}}>{it.val}</span>
+                      <span style={{color:it.c,fontSize:10}}>{it.chg}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
+
+            {/* Header mercado */}
+            <div style={{marginBottom:20,paddingBottom:14,borderBottom:'1px solid var(--border)',display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:12}}>
+              <div>
+                <h1 style={{fontFamily:'var(--font-disp)',fontSize:32,letterSpacing:4,color:'var(--ice)',lineHeight:1}}>MERCADO <span style={{color:'var(--rust)'}}>/ COTACOES</span></h1>
+                <p style={{fontSize:11,color:'var(--ice3)',letterSpacing:1,fontFamily:'var(--font-mono)',fontWeight:300,marginTop:4}}>// Precos em tempo real baseados no rebanho ativo do servidor</p>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <div style={{width:6,height:6,borderRadius:'50%',background:'var(--grn)',animation:'blinkDot 1.2s step-end infinite'}}/>
+                <span style={{fontSize:11,color:'var(--grn)',fontWeight:700,letterSpacing:2,fontFamily:'var(--font-mono)'}}>PREGAO ABERTO</span>
+              </div>
+            </div>
+
+            {/* Cards de animais */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10,marginBottom:20}}>
+              {['bezerro','garrote','boi','abatido'].map(f=>{
+                const imgs={bezerro:'/bezerro.jpg',garrote:'/garrote.jpg',boi:'/boi.jpg',abatido:'/picanha.jpg'}
+                const precoMap={bezerro:mercado?.precos?.bezerro,garrote:mercado?.precos?.garrote,boi:mercado?.precos?.boi,abatido:mercado?.precos?.abate}
+                const origemMap={bezerro:'GOV.NPC — FIXO',garrote:'LIVRE P2P',boi:'LIVRE P2P',abatido:'FRIGORIFICO NPC'}
+                const isAbate=f==='abatido'
+                return <div key={f} style={{background:'var(--card)',border:`1px solid ${isAbate?'var(--rust2)':'var(--border)'}`,borderRadius:0,overflow:'hidden',transition:'border-color .15s'}} onMouseEnter={e=>{e.currentTarget.style.borderColor=isAbate?'var(--rust)':'var(--rust2)'}} onMouseLeave={e=>{e.currentTarget.style.borderColor=isAbate?'var(--rust2)':'var(--border)'}}>
+                  <div style={{height:80,overflow:'hidden',position:'relative',background:'#060810'}}>
+                    <img src={imgs[f]} alt={FASES[f]} style={{width:'100%',height:'100%',objectFit:'cover',filter:`brightness(${isAbate?'.2':'.3'}) saturate(.3)`,display:'block'}} onError={e=>e.target.style.display='none'}/>
+                    <div style={{position:'absolute',top:8,left:0,background:isAbate?'var(--red2)':'var(--rust)',color:isAbate?'var(--red)':'#fff',fontFamily:'var(--font-disp)',fontSize:9,letterSpacing:3,padding:'2px 10px'}}>SEM.{SEMANAS[f]}</div>
+                  </div>
+                  <div style={{padding:'10px 12px 14px'}}>
+                    <div style={{fontFamily:'var(--font-disp)',fontSize:20,letterSpacing:2,color:isAbate?'var(--rust)':'var(--ice)',lineHeight:1,marginBottom:2}}>{FASES[f].toUpperCase()}</div>
+                    <div style={{fontSize:10,color:'var(--ice3)',letterSpacing:2,marginBottom:10,fontWeight:300,textTransform:'uppercase'}}>{PESOS[f]}KG VIVO</div>
+                    <div style={{background:'var(--bg)',border:'1px solid var(--border)',padding:'8px 10px',boxShadow:'inset 0 2px 8px rgba(0,0,0,.6)',display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                      <div>
+                        <div style={{fontSize:9,color:'var(--ice3)',letterSpacing:2,marginBottom:2}}>PRECO</div>
+                        <div style={{fontFamily:'var(--font-disp)',fontSize:22,letterSpacing:1,color:isAbate?'var(--rust)':'var(--grn)',lineHeight:1}}>${fmt(precoMap[f])}</div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontSize:9,color:'var(--ice3)',letterSpacing:2,marginBottom:2}}>ORIGEM</div>
+                        <div style={{fontSize:10,color:'var(--ice2)',fontWeight:700,fontFamily:'var(--font-mono)',letterSpacing:1}}>{origemMap[f]}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              })}
+            </div>
+
+            {/* Indicadores + Rebanho por fase */}
             <div style={gs(280)}>
-              <Card T={T} glow>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:T.text,marginBottom:16}}>Indicadores agora</div>
+              <div style={{background:'var(--card)',border:'1px solid var(--border)',borderLeft:'3px solid var(--rust)',clipPath:'polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,0 100%)',padding:20}}>
+                <div style={{fontSize:10,letterSpacing:4,color:'var(--ice3)',textTransform:'uppercase',marginBottom:16,borderBottom:'1px solid var(--border)',paddingBottom:10,fontFamily:'var(--font-mono)'}}>// Indicadores agora</div>
                 <div style={gs(110)}>
-                  <Metric T={T} icon="🐄" label="Rebanho" value={`${mercado?.rebanho?.total||0}`} sub="cabeças ativas" color={mercado?.rebanho?.total>600?T.red:mercado?.rebanho?.total>400?T.amber:T.gold}/>
-                  <Metric T={T} icon="💰" label="Margem est." value={`${mercado?.margem||'~30'}%`} sub="bezerro→abate" color={T.gold}/>
-                  <Metric T={T} icon="🌾" label="Ração" value={`$${mercado?.precos?.precoRacao||2}/kg`} sub="ciclo completo (bezerro→abate)"/>
-                  <Metric T={T} icon="📦" label="Custo/cab" value={`$${fmt(mercado?.precos?.custoRacao)}`} sub="ração total"/>
+                  <Metric T={T} label="Rebanho" value={`${mercado?.rebanho?.total||0}`} sub="cabecas ativas" color={mercado?.rebanho?.total>600?'var(--red)':mercado?.rebanho?.total>400?'var(--rust)':'var(--grn)'}/>
+                  <Metric T={T} label="Margem est." value={`${mercado?.margem||'~30'}%`} sub="bezerro — abate" color="var(--grn)"/>
+                  <Metric T={T} label="Racao atual" value={`$${mercado?.precos?.precoRacao||2}/kg`} sub="ciclo completo (bezerro—abate)" color={mercado?.precos?.precoRacao>2?'var(--rust)':'var(--ice2)'}/>
+                  <Metric T={T} label="Custo/cab" value={`$${fmt(mercado?.precos?.custoRacao)}`} sub="racao total" color="var(--ice2)"/>
                 </div>
                 <div style={{marginTop:16}}>
-                  <div style={{fontSize:11,color:T.textMuted,marginBottom:6,fontWeight:600,textTransform:'uppercase',letterSpacing:'.6px'}}>Rebanho (últimas entradas)</div>
-                  <MiniChart data={rebanhoHist.length>1?rebanhoHist:[0,mercado?.rebanho?.total||0]} color={T.gold} T={T}/>
+                  <div style={{fontSize:9,color:'var(--ice3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'3px',fontFamily:'var(--font-mono)'}}>// Rebanho · entradas recentes</div>
+                  <MiniChart data={rebanhoHist.length>1?rebanhoHist:[0,mercado?.rebanho?.total||0]} color="var(--rust)" T={T}/>
                 </div>
-              </Card>
-              <Card T={T}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:T.text,marginBottom:16}}>Rebanho por fase</div>
-                {['bezerro','garrote','boi'].map(f=>{
-                  const qty = mercado?.rebanho?.[f]||0
-                  const pct = Math.min((qty/200)*100,100)
+                {mercado?.rebanho?.total>400&&<div style={{marginTop:12,background:mercado.rebanho.total>600?'var(--red2)':'var(--rust3)',border:`1px solid ${mercado.rebanho.total>600?'var(--red)':'var(--rust2)'}`,padding:'6px 10px',fontSize:10,color:mercado.rebanho.total>600?'var(--red)':'var(--rust)',letterSpacing:1,fontWeight:700,fontFamily:'var(--font-mono)'}}>{mercado.rebanho.total>600?'RACAO CARA — MARGEM CRITICA':'DEMANDA ELEVADA — RACAO EM ALTA'}</div>}
+              </div>
+
+              <div style={{background:'var(--card)',border:'1px solid var(--border)',padding:20}}>
+                <div style={{fontSize:10,letterSpacing:4,color:'var(--ice3)',textTransform:'uppercase',marginBottom:16,borderBottom:'1px solid var(--border)',paddingBottom:10,fontFamily:'var(--font-mono)'}}>// Rebanho por fase</div>
+                {['bezerro','garrote','boi'].map((f,idx)=>{
+                  const qty=mercado?.rebanho?.[f]||0
+                  const pct=Math.min((qty/400)*100,100)
+                  const barColor=['var(--grn)','var(--rust)','var(--ice2)'][idx]
                   return <div key={f} style={{marginBottom:14}}>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:5,fontSize:12}}>
-                      <span style={{color:T.textDim,fontWeight:500}}>{FASES[f]}</span>
-                      <span style={{color:T.text,fontWeight:600}}>{qty} cab.</span>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:6,fontSize:11}}>
+                      <span style={{color:'var(--ice2)',letterSpacing:2,textTransform:'uppercase',fontFamily:'var(--font-mono)',fontWeight:400}}>{FASES[f]}</span>
+                      <span style={{color:'var(--ice)',fontWeight:700,fontFamily:'var(--font-disp)',fontSize:14,letterSpacing:1}}>{qty} CAB.</span>
                     </div>
-                    <div style={{background:T.inputBg,borderRadius:6,height:8,overflow:'hidden'}}>
-                      <div style={{width:`${pct}%`,height:'100%',background:`linear-gradient(90deg,${T.greenDark},${T.gold})`,borderRadius:6,transition:'width .6s cubic-bezier(.4,0,.2,1)'}}/>
+                    <div style={{background:'var(--input-bg)',height:4,borderRadius:0}}>
+                      <div style={{width:`${pct}%`,height:'100%',background:barColor,transformOrigin:'left',animation:'barGrow .8s cubic-bezier(.4,0,.2,1) both'}}/>
                     </div>
                   </div>
                 })}
-                <div style={{marginTop:8,paddingTop:12,borderTop:`1px solid ${T.border}`,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontSize:11,color:T.textMuted}}>Limite de ração normal: 400 cab.</span>
-                  <Badge type={mercado?.rebanho?.total>600?'danger':mercado?.rebanho?.total>400?'warn':'ok'}>{mercado?.rebanho?.total>600?'Ração cara':mercado?.rebanho?.total>400?'Elevada':'Normal'}</Badge>
+                <div style={{marginTop:8,paddingTop:12,borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:10,color:'var(--ice3)',letterSpacing:1,fontFamily:'var(--font-mono)'}}>Limite racao normal: 400 cab.</span>
+                  <Badge type={mercado?.rebanho?.total>600?'danger':mercado?.rebanho?.total>400?'warn':'ok'}>{mercado?.rebanho?.total>600?'RACAO CARA':mercado?.rebanho?.total>400?'ELEVADA':'NORMAL'}</Badge>
                 </div>
-              </Card>
+                <div style={{marginTop:20}}>
+                  <div style={{fontSize:9,letterSpacing:3,color:'var(--ice3)',textTransform:'uppercase',marginBottom:10,fontFamily:'var(--font-mono)'}}>// Cotacoes</div>
+                  {[{sym:'BZR',label:'Bezerro · S1',preco:mercado?.precos?.bezerro,chg:null,kill:false},{sym:'GRR',label:'Garrote · S2',preco:mercado?.precos?.garrote,chg:mercado?.precos?.garrote?`+${((mercado.precos.garrote/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:null,kill:false},{sym:'BOI',label:'Boi · S3',preco:mercado?.precos?.boi,chg:mercado?.precos?.boi?`+${((mercado.precos.boi/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:null,kill:false},{sym:'FGR',label:'Frigorifico · S4',preco:mercado?.precos?.abate,chg:mercado?.precos?.abate?`+${((mercado.precos.abate/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:null,kill:true}].map(row=>(
+                    <div key={row.sym} style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:12,alignItems:'center',padding:'8px 0',borderBottom:'1px solid rgba(58,64,72,.4)'}}>
+                      <div style={{fontSize:11,fontWeight:700,color:'var(--ice)',letterSpacing:2,fontFamily:'var(--font-mono)'}}>{row.sym} / {row.label}</div>
+                      <div style={{fontFamily:'var(--font-disp)',fontSize:18,letterSpacing:1,color:row.kill?'var(--rust)':'var(--grn)'}}>${fmt(row.preco)}</div>
+                      <div style={{fontSize:11,fontWeight:700,minWidth:54,textAlign:'right',color:row.chg?'var(--grn)':'var(--ice3)',fontFamily:'var(--font-mono)'}}>{row.chg||'FIXO'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </>}
-
           {/* COMPRAR */}
           {page==='comprar'&&!user&&<Alrt type="warn">Faça login para solicitar uma compra.</Alrt>}
           {page==='comprar'&&user&&<>

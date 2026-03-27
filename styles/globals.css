@@ -1,7 +1,115 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #080808; color: #ccc; font-family: 'Inter', system-ui, sans-serif; }
-input, select, button { font-family: inherit; }
-input::placeholder { color: #444; }
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #111; }
-::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+
+/* ─── Design Tokens ──────────────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg:       #0B0E14;
+  --panel:    #0F1218;
+  --card:     #15181E;
+  --card2:    #1C2028;
+  --input-bg: #0d1017;
+
+  /* Borders */
+  --border:   #2A2F3A;
+  --border2:  #3A4050;
+
+  /* Accents */
+  --rust:     #C84B31;
+  --rust2:    #8A3020;
+  --rust3:    #3A1408;
+
+  /* Data */
+  --grn:      #00E054;
+  --grn2:     #004D1C;
+  --red:      #FF3333;
+  --red2:     #5A0A0A;
+
+  /* Text */
+  --ice:      #C8D0D8;
+  --ice2:     #7A8490;
+  --ice3:     #3A4048;
+
+  /* Typography */
+  --font-disp: 'Bebas Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* ─── Reset ──────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  color: var(--ice);
+  -webkit-font-smoothing: antialiased;
+}
+
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--rust2); }
+
+/* ─── Responsive Utilities ───────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .desktop-only { display: none !important; }
+  .mobile-header { display: flex !important; }
+}
+@media (min-width: 769px) {
+  .mobile-only  { display: none !important; }
+  .mobile-header { display: none !important; }
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+@keyframes barGrow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes tickerScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes blinkDot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+@keyframes slideRight {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes slideLeft {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+
+/* ─── Page transitions ───────────────────────────────────────────────────────── */
+.page-enter { animation: fadeSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.drawer-open { animation: slideRight 0.28s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+/* ─── Button hover utilities (usadas pelo Btn) ───────────────────────────────── */
+.btn-industrial {
+  transition: none;
+  border-radius: 0;
+  font-family: var(--font-disp);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.btn-industrial:active { transform: translate(2px, 3px); }
+.btn-industrial:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
