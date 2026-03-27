@@ -86,13 +86,13 @@ const D = {
   text:'#eaddcf', textDim:'#a6968a', textMuted:'#5c4a42',
 }
 const L = {
-  bg:'#150f0c', panel:'#1e1612', card:'#1e1612', cardHover:'#261c17',
-  border:'#36251e', border2:'#523a2f',
-  gold:'#c28c46', goldLight:'#d4a96a', goldDark:'#8a602c',
-  cream:'#eaddcf', creamDim:'#a6968a', creamMuted:'#5c4a42',
-  green:'#4ade80', greenDark:'#14532d', red:'#f87171', amber:'#c28c46',
-  inputBg:'#130d0a', navBg:'#1e1612', isDark:true,
-  text:'#eaddcf', textDim:'#a6968a', textMuted:'#5c4a42',
+  bg:'#f5ede2', panel:'#ede0cc', card:'#f9f3ea', cardHover:'#fff8f0',
+  border:'#d4b896', border2:'#b8946a',
+  gold:'#8a5a1a', goldLight:'#a06c28', goldDark:'#5c3a0a',
+  cream:'#2a1a0a', creamDim:'#5c3a1e', creamMuted:'#8a6a4a',
+  green:'#16803a', greenDark:'#bbf7d0', red:'#b91c1c', amber:'#8a5a1a',
+  inputBg:'#ede0cc', navBg:'#e8d9c4', isDark:false,
+  text:'#2a1a0a', textDim:'#5c3a1e', textMuted:'#8a6a4a',
 }
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
@@ -580,7 +580,7 @@ export default function App() {
     setTimeout(()=>setNotification(''), 4000)
   }
 
-  function toggleDark(){const nd=!dark;setDark(nd);localStorage.setItem('gvrpnl_dark',nd)}
+  function toggleDark(){const nd=!dark;setDark(nd);localStorage.setItem('gvrpnl_dark',nd);document.documentElement.setAttribute('data-theme',nd?'dark':'light')}
   function toggleSound(){const ns=!soundOn;setSoundOn(ns);localStorage.setItem('gvrpnl_sound',ns)}
 
   async function login() {
@@ -850,7 +850,7 @@ export default function App() {
                 </div>
                 <div style={{marginTop:16}}>
                   <div style={{fontSize:9,color:'var(--ice3)',marginBottom:6,textTransform:'uppercase',letterSpacing:2,fontFamily:'var(--font-data)'}}>Rebanho · entradas recentes</div>
-                  <MiniChart data={rebanhoHist.length>1?rebanhoHist:[0,mercado?.rebanho?.total||0]} color="var(--rust)" T={T}/>
+                  <MiniChart data={rebanhoHist.length>1?rebanhoHist:[0,mercado?.rebanho?.total||0]} color="#c28c46" T={T}/>
                 </div>
                 {mercado?.rebanho?.total>400&&<div style={{marginTop:12,background:mercado.rebanho.total>600?'var(--red2)':'var(--rust3)',border:`1px solid ${mercado.rebanho.total>600?'var(--red)':'var(--rust2)'}`,padding:'8px 12px',fontSize:11,color:mercado.rebanho.total>600?'var(--red)':'var(--gold)',borderRadius:4,letterSpacing:0.5,fontWeight:600,fontFamily:'var(--font-data)'}}>{mercado.rebanho.total>600?'⚠ Ração cara — Margem crítica':'↑ Demanda elevada — Ração em alta'}</div>}
               </div>

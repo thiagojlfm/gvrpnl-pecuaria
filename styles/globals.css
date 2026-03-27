@@ -44,6 +44,29 @@
   --font-data:  'DM Mono', monospace;
 }
 
+/* ─── Tema Claro — Café com leite / Areia ───────────────────────────────────── */
+[data-theme="light"] {
+  --bg:       #f5ede2;
+  --panel:    #ede0cc;
+  --card:     #f9f3ea;
+  --card2:    #fff8f0;
+  --input-bg: #ede0cc;
+  --border:   #d4b896;
+  --border2:  #b8946a;
+  --rust:     #8a5a1a;
+  --rust2:    #a06c28;
+  --rust3:    #f5e6d0;
+  --gold:     #8a5a1a;
+  --gold-dim: #5c3a0a;
+  --grn:      #16803a;
+  --grn2:     #bbf7d0;
+  --red:      #b91c1c;
+  --red2:     #fecaca;
+  --ice:      #2a1a0a;
+  --ice2:     #5c3a1e;
+  --ice3:     #8a6a4a;
+}
+
 /* ─── Reset ──────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
