@@ -1197,22 +1197,112 @@ export default function App() {
           </>}
 
           {/* RANKING */}
-          {page==='ranking'&&<>
-            <SectionTitle T={T} icon="🏆" title="Ranking de Criadores" sub="Top produtores do servidor — ordenado por volume total abatido"/>
-            <Card T={T} hover={false}>
-              {ranking.length===0?<div style={{textAlign:'center',padding:48,color:T.textMuted}}>Nenhum abate registrado ainda.</div>:
-              <div style={{display:'flex',flexDirection:'column',gap:0}}>
-                {ranking.map((r,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:16,padding:'16px 4px',borderBottom:i<ranking.length-1?`1px solid ${T.border}`:'none',transition:'background .15s'}} onMouseEnter={e=>e.currentTarget.style.background=T.inputBg} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                  <div style={{width:40,textAlign:'center',fontSize:i<3?24:16,flexShrink:0}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}º`}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:15,fontWeight:700,color:T.text,fontFamily:"'Playfair Display',serif"}}>{r.nome}</div>
-                    <div style={{fontSize:12,color:T.textMuted}}>{r.total_abates} abates · {fmt(r.total_cabecas)} cabeças</div>
+          {page==='ranking'&&(()=>{
+            // ── Ranking de Fazendas ao Vivo (calculado dos lotes ativos) ──────
+            const fazRanking = fazendas
+              .filter(f => f.dono_nome)
+              .map(f => {
+                const lotsFaz = lotes.filter(l => String(l.fazenda_id) === String(f.id) && l.status === 'ativo')
+                const totalCab = lotsFaz.reduce((s,l) => s + l.quantidade, 0)
+                const valorEst = lotsFaz.reduce((s,l) => s + l.quantidade * (mercado?.precos?.abate||0), 0)
+                const consumo  = lotsFaz.reduce((s,l) => s + ({bezerro:3,garrote:5,boi:8,abatido:0}[l.fase]||0)*l.quantidade, 0)
+                const breakdown = {
+                  bezerro: lotsFaz.filter(l=>l.fase==='bezerro').reduce((s,l)=>s+l.quantidade,0),
+                  garrote: lotsFaz.filter(l=>l.fase==='garrote').reduce((s,l)=>s+l.quantidade,0),
+                  boi:     lotsFaz.filter(l=>l.fase==='boi').reduce((s,l)=>s+l.quantidade,0),
+                }
+                return { ...f, totalCab, valorEst, consumo, breakdown }
+              })
+              .filter(f => f.totalCab > 0)
+              .sort((a,b) => b.totalCab - a.totalCab)
+
+            return <>
+              <SectionTitle T={T} icon="🏆" title="Ranking de Criadores" sub="Top produtores do servidor — ordenado por volume total abatido"/>
+              <Card T={T} hover={false}>
+                {ranking.length===0
+                  ?<div style={{textAlign:'center',padding:48,color:T.textMuted}}>Nenhum abate registrado ainda.</div>
+                  :<div style={{display:'flex',flexDirection:'column',gap:0}}>
+                    {ranking.map((r,i)=>(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:16,padding:'16px 4px',borderBottom:i<ranking.length-1?`1px solid ${T.border}`:'none',transition:'background .15s'}} onMouseEnter={e=>e.currentTarget.style.background=T.inputBg} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        <div style={{width:40,textAlign:'center',fontSize:i<3?24:16,flexShrink:0}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}º`}</div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:15,fontWeight:700,color:T.text,fontFamily:"'Playfair Display',serif"}}>{r.nome}</div>
+                          <div style={{fontSize:12,color:T.textMuted}}>{r.total_abates} abates · {fmt(r.total_cabecas)} cabeças</div>
+                        </div>
+                        <div style={{fontSize:20,fontWeight:800,color:T.gold,fontFamily:"'Playfair Display',serif"}}>${fmt(r.total_ganho)}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{fontSize:20,fontWeight:800,color:T.gold,fontFamily:"'Playfair Display',serif"}}>${fmt(r.total_ganho)}</div>
-                </div>)}
-              </div>}
-            </Card>
-          </>}
+                }
+              </Card>
+
+              {/* ── Ranking de Fazendas ao Vivo ── */}
+              <div style={{marginTop:32,marginBottom:16,paddingBottom:12,borderBottom:`1px solid ${T.border}`,display:'flex',alignItems:'center',gap:10}}>
+                <span style={{fontSize:20}}>🏡</span>
+                <div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:T.text}}>Ranking de Fazendas</div>
+                  <div style={{fontSize:11,color:T.textMuted}}>Propriedades com mais gado ativo agora — atualizado em tempo real</div>
+                </div>
+              </div>
+              {fazRanking.length===0
+                ?<Card T={T} hover={false}><div style={{textAlign:'center',padding:32,color:T.textMuted}}>Nenhuma fazenda com gado ativo no momento.</div></Card>
+                :<div style={{display:'flex',flexDirection:'column',gap:10}}>
+                  {fazRanking.map((f,i)=>{
+                    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':null
+                    const pctCap = Math.min(100,(f.totalCab/(Number(f.tamanho_ha)*3))*100)
+                    const barCor = pctCap>90?'#f87171':pctCap>70?'#c28c46':'#4ade80'
+                    return (
+                      <div key={f.id} style={{
+                        background:T.card, border:`1px solid ${i===0?T.gold+'55':T.border}`,
+                        borderLeft:`3px solid ${i===0?T.gold:i===1?T.border2:T.border}`,
+                        borderRadius:8, padding:'16px 20px',
+                        boxShadow: i===0?`0 4px 20px rgba(194,140,70,.2)`:'0 2px 10px rgba(0,0,0,.3)',
+                        transition:'all .2s',
+                      }} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.gold+'88'}} onMouseLeave={e=>{e.currentTarget.style.borderColor=i===0?T.gold+'55':T.border}}>
+                        <div style={{display:'flex',alignItems:'flex-start',gap:14}}>
+                          {/* Posição */}
+                          <div style={{width:36,textAlign:'center',flexShrink:0,paddingTop:2}}>
+                            {medal
+                              ?<span style={{fontSize:24}}>{medal}</span>
+                              :<span style={{fontSize:16,fontWeight:700,color:T.textMuted,fontFamily:"'DM Mono',monospace"}}>{i+1}º</span>
+                            }
+                          </div>
+                          {/* Info principal */}
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:4,flexWrap:'wrap'}}>
+                              <span style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:T.text}}>{f.nome}</span>
+                              <span style={{fontSize:11,color:T.textMuted,fontFamily:"'DM Mono',monospace"}}>{f.codigo}</span>
+                              {f.dono_nome&&<span style={{fontSize:11,color:T.gold,fontWeight:600}}>👤 {f.dono_nome}</span>}
+                            </div>
+                            {/* Breakdown de fases */}
+                            <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
+                              {f.breakdown.bezerro>0&&<span style={{fontSize:11,background:'rgba(122,176,224,.1)',color:'#7ab0e0',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(122,176,224,.3)',fontFamily:"'DM Mono',monospace"}}>{f.breakdown.bezerro} bzr</span>}
+                              {f.breakdown.garrote>0&&<span style={{fontSize:11,background:'rgba(194,140,70,.1)',color:'#c28c46',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(194,140,70,.3)',fontFamily:"'DM Mono',monospace"}}>{f.breakdown.garrote} grr</span>}
+                              {f.breakdown.boi>0&&<span style={{fontSize:11,background:'rgba(74,222,128,.1)',color:'#4ade80',padding:'2px 8px',borderRadius:4,border:'1px solid rgba(74,222,128,.3)',fontFamily:"'DM Mono',monospace"}}>{f.breakdown.boi} boi</span>}
+                              <span style={{fontSize:11,color:T.textMuted,fontFamily:"'DM Mono',monospace"}}>{f.consumo}kg ração/dia</span>
+                            </div>
+                            {/* Barra de ocupação */}
+                            <div style={{display:'flex',alignItems:'center',gap:8}}>
+                              <div style={{flex:1,background:T.border,borderRadius:4,height:5,overflow:'hidden'}}>
+                                <div style={{width:`${pctCap}%`,height:'100%',background:barCor,borderRadius:4,transition:'width .6s ease'}}/>
+                              </div>
+                              <span style={{fontSize:10,color:T.textMuted,fontFamily:"'DM Mono',monospace",flexShrink:0}}>{pctCap.toFixed(0)}% cap.</span>
+                            </div>
+                          </div>
+                          {/* Valor estimado */}
+                          <div style={{textAlign:'right',flexShrink:0}}>
+                            <div style={{fontSize:10,color:T.textMuted,marginBottom:4,fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Valor est.</div>
+                            <div style={{fontSize:20,fontWeight:800,color:T.gold,fontFamily:"'Playfair Display',serif"}}>${fmt(f.valorEst)}</div>
+                            <div style={{fontSize:12,color:T.textMuted,marginTop:2,fontFamily:"'DM Mono',monospace"}}>{f.totalCab} cab. · {f.tamanho_ha}ha</div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              }
+            </>
+          })()}
 
           {/* AJUDA */}
           {page==='ajuda'&&<>
@@ -1641,7 +1731,7 @@ export default function App() {
           {/* ── FAZENDAS ── */}
           {page==='fazendas'&&<FazendasPage T={T} user={user} api={api} notify={notify} users={users}/>}
           {page==='pastagem'&&<PastagemPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}
-          {page==='minha_fazenda'&&<MinhaFazendaPage T={T} user={user} api={api} notify={notify} lotes={lotes} mercado={mercado}/>}
+          {page==='minha_fazenda'&&<MinhaFazendaPage T={T} user={user} api={api} notify={notify} lotes={lotes} mercado={mercado} racao={racao}/>}
           {page==='celeiro'&&<CeleiroPage T={T} user={user} api={api} notify={notify} mercado={mercado} sounds={sounds}/>}
           {page==='transportadora'&&<TransportadoraPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}
           {page==='fretes_npc'&&<FretesNPCPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}

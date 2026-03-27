@@ -406,7 +406,228 @@ function AluguelPastoNPC({ T, user, api, notify, fazenda }) {
   )
 }
 
-export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
+// ─── Alertas Panel ────────────────────────────────────────────────────────────
+function AlertasPanel({ minhasLotes, racao, cap, custos, T }) {
+  const alertas = []
+
+  // Ração crítica
+  const consumoDiario = minhasLotes.filter(l => l.status === 'ativo')
+    .reduce((s, l) => s + ({bezerro:3,garrote:5,boi:8,abatido:0}[l.fase]||0) * l.quantidade, 0)
+  const diasRacao = racao?.kg_disponivel > 0 && consumoDiario > 0
+    ? Math.floor(racao.kg_disponivel / consumoDiario) : null
+
+  if (diasRacao !== null && diasRacao <= 7) {
+    const urgente = diasRacao <= 2
+    alertas.push({
+      id:'racao', urgente,
+      emoji: urgente ? '🚨' : '⚠',
+      titulo: diasRacao === 0 ? 'RAÇÃO ZERADA — Gado sem comida!' : diasRacao <= 2 ? `Ração acaba em ${diasRacao} dia(s)!` : `Ração em ${diasRacao} dias`,
+      desc: `Consumo: ${consumoDiario}kg/dia · Estoque: ${fmt(racao.kg_disponivel)}kg — vá ao Celeiro`,
+      cor: urgente ? '#f87171' : '#c28c46',
+    })
+  }
+
+  // Superlotada
+  if (cap?.lotada) {
+    alertas.push({
+      id:'lotada', urgente: false,
+      emoji:'🚜',
+      titulo:'Fazenda superlotada',
+      desc:`${cap.usada.toFixed(1)} ha usados de ${cap.total} ha disponíveis — venda animais ou alugue pasto`,
+      cor:'#f87171',
+    })
+  }
+
+  // Custos urgentes pendentes
+  custos.filter(c => {
+    const tipo = TIPOS_CUSTO.find(t => t.tipo === c.tipo)
+    return tipo?.urgente && c.status === 'pendente'
+  }).forEach(c => {
+    const tipo = TIPOS_CUSTO.find(t => t.tipo === c.tipo)
+    alertas.push({
+      id:`custo_${c.id}`, urgente: true,
+      emoji: tipo?.emoji || '⚠',
+      titulo: tipo?.label || c.tipo,
+      desc: tipo?.desc || c.descricao || 'Chamado urgente pendente',
+      cor:'#f87171',
+    })
+  })
+
+  // Fase iminente (< 24h)
+  const iminentes = minhasLotes.filter(l => {
+    if (!l.data_fase || l.fase === 'abatido') return false
+    const dias = (new Date(l.data_fase) - Date.now()) / 86400000
+    return dias >= 0 && dias <= 1
+  })
+  if (iminentes.length > 0) {
+    alertas.push({
+      id:'fase', urgente: false,
+      emoji:'🐄',
+      titulo:`${iminentes.length} lote(s) mudam de fase hoje`,
+      desc: iminentes.map(l => `${l.codigo} (${l.fase})`).join(' · '),
+      cor:'#4ade80',
+    })
+  }
+
+  if (alertas.length === 0) return null
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {alertas.map(a => (
+        <div key={a.id} style={{
+          display:'flex', alignItems:'flex-start', gap:12,
+          padding:'12px 16px', borderRadius:8, marginBottom:8,
+          background:`${a.cor}0d`,
+          border:`1px solid ${a.cor}44`,
+          borderLeft:`3px solid ${a.cor}`,
+          animation: a.urgente ? 'pulse 2s infinite' : 'none',
+        }}>
+          <span style={{ fontSize:20, flexShrink:0 }}>{a.emoji}</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:a.cor, marginBottom:2, fontFamily:"'Playfair Display',serif" }}>{a.titulo}</div>
+            <div style={{ fontSize:11, color:T.textDim, lineHeight:1.5 }}>{a.desc}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Contador Ração ───────────────────────────────────────────────────────────
+function ContadorRacao({ racao, minhasLotes, T }) {
+  const consumoDiario = minhasLotes.filter(l => l.status === 'ativo')
+    .reduce((s, l) => s + ({bezerro:3,garrote:5,boi:8,abatido:0}[l.fase]||0) * l.quantidade, 0)
+
+  if (consumoDiario === 0 || !racao) return null
+
+  const diasLeft = racao.kg_disponivel > 0 ? Math.floor(racao.kg_disponivel / consumoDiario) : 0
+  const kgLeft = racao.kg_disponivel || 0
+  const cor = diasLeft <= 2 ? '#f87171' : diasLeft <= 5 ? '#c28c46' : '#4ade80'
+  const emoji = diasLeft <= 2 ? '🚨' : diasLeft <= 5 ? '⚠' : '🌾'
+  const dataFim = diasLeft > 0
+    ? new Date(Date.now() + diasLeft * 86400000).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })
+    : 'Hoje!'
+
+  return (
+    <div style={{
+      background:T.card, border:`1px solid ${cor}44`,
+      borderLeft:`4px solid ${cor}`, borderRadius:8,
+      padding:'16px 20px', marginBottom:16,
+      display:'flex', alignItems:'center', gap:20,
+      boxShadow:'0 2px 12px rgba(0,0,0,.3)',
+    }}>
+      <div style={{ fontSize:36, flexShrink:0 }}>{emoji}</div>
+      <div style={{ flex:1 }}>
+        <div style={{ fontSize:10, color:T.textMuted, textTransform:'uppercase', letterSpacing:2, marginBottom:4, fontFamily:"'DM Mono',monospace" }}>
+          Estoque de Ração
+        </div>
+        <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
+          <span style={{ fontSize:40, fontWeight:800, color:cor, fontFamily:"'DM Mono',monospace", lineHeight:1 }}>
+            {diasLeft}
+          </span>
+          <span style={{ fontSize:15, color:T.textDim }}>dias restantes</span>
+        </div>
+        <div style={{ fontSize:11, color:T.textMuted, marginTop:4, fontFamily:"'DM Mono',monospace" }}>
+          {fmt(kgLeft)} kg · consumo {consumoDiario} kg/dia
+        </div>
+      </div>
+      <div style={{ textAlign:'right', flexShrink:0 }}>
+        <div style={{ fontSize:10, color:T.textMuted, marginBottom:6, fontFamily:"'DM Mono',monospace", textTransform:'uppercase', letterSpacing:1 }}>Acaba em</div>
+        <div style={{ fontSize:18, fontWeight:700, color, fontFamily:"'Playfair Display',serif" }}>{dataFim}</div>
+        <div style={{ marginTop:10, height:4, width:80, background:T.border, borderRadius:4, overflow:'hidden' }}>
+          <div style={{ height:'100%', borderRadius:4, background:cor, width:`${Math.min(100, (diasLeft/30)*100)}%`, transition:'width .5s' }}/>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Agenda do Rebanho ────────────────────────────────────────────────────────
+function AgendaRebanho({ lotes, T }) {
+  const faseNext  = { bezerro:'Garrote', garrote:'Boi', boi:'Abate' }
+  const faseCor   = { bezerro:'#7ab0e0', garrote:'#c28c46', boi:'#4ade80' }
+
+  const ativos = lotes
+    .filter(l => l.data_fase && l.fase !== 'abatido' && l.status === 'ativo')
+    .sort((a, b) => new Date(a.data_fase) - new Date(b.data_fase))
+
+  if (ativos.length === 0) return null
+
+  return (
+    <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:8, padding:18, marginBottom:16, boxShadow:'0 4px 20px rgba(0,0,0,.4)' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, paddingBottom:12, borderBottom:`1px solid ${T.border}` }}>
+        <span style={{ fontSize:20 }}>📅</span>
+        <div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:T.text }}>Agenda do Rebanho</div>
+          <div style={{ fontSize:11, color:T.textMuted }}>Próximas mudanças de fase — ordenado por data</div>
+        </div>
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {ativos.map(l => {
+          const now     = Date.now()
+          const end     = new Date(l.data_fase).getTime()
+          const totalMs = 7 * 24 * 3600 * 1000
+          const start   = end - totalMs
+          const pct     = Math.max(0, Math.min(100, ((now - start) / totalMs) * 100))
+          const diasMs  = end - now
+          const dias    = Math.max(0, Math.ceil(diasMs / 86400000))
+          const horas   = Math.max(0, Math.ceil(diasMs / 3600000))
+          const cor     = faseCor[l.fase] || T.gold
+          const urgente = dias === 0
+
+          const label = urgente
+            ? (horas <= 1 ? '⚡ AGORA' : `${horas}h`)
+            : `${dias}d`
+
+          return (
+            <div key={l.id} style={{
+              padding:'12px 14px', background:T.inputBg,
+              borderRadius:8, border:`1px solid ${urgente ? cor+'66' : T.border}`,
+              transition:'border-color .2s',
+            }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                  <span style={{ fontWeight:700, color:T.text, fontSize:13, fontFamily:"'DM Mono',monospace" }}>{l.codigo}</span>
+                  <span style={{ fontSize:11, color:T.textMuted }}>{l.quantidade} cab.</span>
+                  <span style={{
+                    fontSize:11, background:`${cor}18`, color:cor,
+                    padding:'2px 8px', borderRadius:4, fontWeight:600,
+                    border:`1px solid ${cor}44`, fontFamily:"'DM Mono',monospace",
+                  }}>
+                    {l.fase} → {faseNext[l.fase]}
+                  </span>
+                </div>
+                <span style={{
+                  fontSize:15, fontWeight:800,
+                  color: urgente ? '#f87171' : dias <= 1 ? '#c28c46' : cor,
+                  fontFamily:"'DM Mono',monospace",
+                  animation: urgente ? 'pulse 1.2s infinite' : 'none',
+                  flexShrink:0,
+                }}>{label}</span>
+              </div>
+              {/* Progress bar — semana de 7 dias */}
+              <div style={{ background:T.border, borderRadius:4, height:6, overflow:'hidden', marginBottom:6 }}>
+                <div style={{
+                  width:`${pct}%`, height:'100%', borderRadius:4,
+                  background: dias <= 1
+                    ? 'linear-gradient(90deg,#c28c46,#f87171)'
+                    : `linear-gradient(90deg,${cor}66,${cor})`,
+                  transition:'width 1s ease',
+                }}/>
+              </div>
+              <div style={{ fontSize:10, color:T.textMuted, fontFamily:"'DM Mono',monospace" }}>
+                Previsto: {new Date(l.data_fase).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})} às {new Date(l.data_fase).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Minha Fazenda Page ───────────────────────────────────────────────────────
+export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado, racao }) {
   const [fazendas, setFazendas] = useState([])
   const [selectedFaz, setSelectedFaz] = useState(null)
   const [fretes, setFretes] = useState([])
@@ -500,6 +721,9 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
         }}/>
       ))}
 
+      {/* ── Contador de Ração ── */}
+      <ContadorRacao racao={racao} minhasLotes={minhasLotes} T={T}/>
+
       {/* Selector se tem mais de 1 fazenda */}
       {fazendas.length > 1 && (
         <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
@@ -527,6 +751,9 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
               </div>
             )}
           </div>
+
+          {/* ── Alertas automáticos ── */}
+          <AlertasPanel minhasLotes={minhasLotes} racao={racao} cap={cap} custos={custos} T={T}/>
 
           {/* Capacidade */}
           {cap && (
@@ -592,6 +819,9 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado }) {
               </div>
             </div>
           )}
+
+          {/* ── Agenda do Rebanho ── */}
+          <AgendaRebanho lotes={minhasLotes} T={T}/>
 
           {/* Aluguel de pasto NPC */}
           {cap?.lotada && (
