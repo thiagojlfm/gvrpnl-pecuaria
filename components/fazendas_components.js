@@ -2435,11 +2435,12 @@ export function PastagemPage({ T, user, api, notify, sounds }) {
   const [dados, setDados] = useState(null)
   const [loading, setLoading] = useState(true)
   const [alugando, setAlugando] = useState(null)
+  const [abaAdmin, setAbaAdmin] = useState('campos') // 'campos' | 'faturas'
 
   const load = useCallback(async () => {
     setLoading(true)
     const [r, jogadores] = await Promise.all([
-      fetch('/api/pastagem').then(r=>r.json()),
+      api('/api/pastagem').catch(()=>({})),
       user?.role==='admin' ? api('/api/admin/usuarios').catch(()=>[]) : Promise.resolve([])
     ])
     setDados({ ...r, jogadores: Array.isArray(jogadores) ? jogadores.filter(u=>u.role==='jogador'&&u.status==='aprovado') : [] })
@@ -2462,124 +2463,232 @@ export function PastagemPage({ T, user, api, notify, sounds }) {
 
   const campos = dados?.campos || []
   const meus = dados?.meus || []
+  const todos = dados?.todos || []
+  const pendentes = todos.filter(a => a.status_pagamento === 'pendente')
+
+  // ── FOTOS por campo_id ──────────────────────────────────────────────────────
+  const FOTOS = {
+    1:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80',
+    2:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80',
+    3:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80',
+    4:'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=80',
+    5:'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80',
+    6:'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80',
+  }
 
   return (
     <div>
-      <div style={{ marginBottom:28, paddingBottom:16, borderBottom:`1px solid ${T.border}` }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
-          <span style={{ fontSize:24 }}>🌿</span>
-          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Aluguel de Pasto</h1>
+      {/* Header */}
+      <div style={{ marginBottom:20, paddingBottom:16, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <span style={{ fontSize:24 }}>🌿</span>
+            <div>
+              <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Aluguel de Pasto</h1>
+              <p style={{ fontSize:12, color:T.textMuted }}>Campos extras para rebanhos superlotados — 7 dias por contrato</p>
+            </div>
+          </div>
+          {user?.role === 'admin' && (
+            <div style={{ display:'flex', gap:8 }}>
+              {['campos','faturas'].map(a => (
+                <button key={a} onClick={()=>setAbaAdmin(a)} style={{
+                  padding:'6px 16px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                  background: abaAdmin===a ? T.gold : 'transparent',
+                  color: abaAdmin===a ? '#fff' : T.textMuted,
+                  border: `1px solid ${abaAdmin===a ? T.gold : T.border}`
+                }}>
+                  {a==='campos' ? '🗺 Campos' : `💰 Faturas ${pendentes.length>0?`(${pendentes.length} pend.)`:''}` }
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Alugue campos extras quando sua fazenda estiver superlotada — 7 dias por contrato</p>
       </div>
 
-      {/* Meus aluguéis ativos */}
-      {meus.length > 0 && (
-        <div style={{ background:T.card, border:'1px solid #2a5a12', borderRadius:14, padding:18, marginBottom:20 }}>
-          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:'#4ad4a0', marginBottom:12 }}>Seus aluguéis ativos</div>
-          {meus.map(a => (
-            <div key={a.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:`1px solid ${T.border}`, fontSize:13 }}>
-              <div>
-                <div style={{ fontWeight:600, color:T.text }}>{a.campo_nome}</div>
-                <div style={{ fontSize:11, color:T.textMuted }}>{a.ha_alugado}ha · válido até {new Date(a.valido_ate).toLocaleDateString('pt-BR')}</div>
-              </div>
-              <span style={{ color:'#4ad4a0', fontWeight:700, fontFamily:"'Playfair Display',serif" }}>${fmt(a.valor_pago)}</span>
+      {/* ── ABA FATURAS (admin) ────────────────────────────────────────────── */}
+      {user?.role==='admin' && abaAdmin==='faturas' && (
+        <div>
+          {todos.length === 0 ? (
+            <div style={{ textAlign:'center', padding:48, color:T.textMuted, fontSize:13 }}>Nenhum pasto alugado no momento.</div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {todos.map(a => {
+                const campo = campos.find(c => c.id === a.campo_id)
+                const pago = a.status_pagamento === 'pago'
+                return (
+                  <div key={a.id} style={{
+                    background: T.card, border: `1px solid ${pago ? '#2a5a12' : '#6a3800'}`,
+                    borderRadius:14, padding:'16px 20px',
+                    display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12
+                  }}>
+                    <div style={{ display:'flex', gap:14, alignItems:'center' }}>
+                      <img src={FOTOS[a.campo_id]} alt="" style={{ width:56, height:56, borderRadius:10, objectFit:'cover', filter:'brightness(.7)' }} onError={e=>e.target.style.display='none'}/>
+                      <div>
+                        <div style={{ fontWeight:700, color:T.text, fontSize:14 }}>{a.campo_nome}</div>
+                        <div style={{ fontSize:12, color:T.textMuted }}>{a.ha_alugado}ha · {a.jogador_nome}</div>
+                        <div style={{ fontSize:11, color:T.textMuted }}>Vence: {new Date(a.valido_ate).toLocaleDateString('pt-BR')}</div>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                      <div style={{ textAlign:'right' }}>
+                        <div style={{ fontSize:18, fontWeight:800, color:'#6ab840', fontFamily:"'Playfair Display',serif" }}>${fmt(a.valor_semana||campo?.preco_semana||0)}</div>
+                        <div style={{ fontSize:10, color:T.textMuted }}>por semana</div>
+                      </div>
+                      {pago ? (
+                        <span style={{ background:'#0a2a1a', color:'#4ad4a0', border:'1px solid #1a6a4a', fontSize:11, padding:'4px 12px', borderRadius:20, fontWeight:600 }}>✓ Pago</span>
+                      ) : (
+                        <div style={{ display:'flex', gap:8 }}>
+                          <button onClick={async()=>{
+                            await api('/api/pastagem',{method:'PATCH',body:JSON.stringify({action:'quitar',aluguel_id:a.id})})
+                            sounds?.coin()
+                            notify(`✓ ${a.jogador_nome} — pagamento confirmado!`)
+                            load()
+                          }} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#1a4a10,#3a7a20)', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                            ✓ Quitar
+                          </button>
+                          <button onClick={async()=>{
+                            await api('/api/pastagem',{method:'PATCH',body:JSON.stringify({action:'desassociar',campo_id:a.campo_id})})
+                            notify('Campo liberado.')
+                            load()
+                          }} style={{ padding:'6px 10px', background:'rgba(100,20,20,.3)', color:'#e06060', border:'1px solid #6a1818', borderRadius:8, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                            Liberar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          ))}
+          )}
         </div>
       )}
 
-      {/* Info */}
-      <div style={{ background:'rgba(42,24,0,.3)', border:`1px solid ${T.border}`, borderRadius:12, padding:'12px 16px', marginBottom:20, fontSize:12, color:'#a08040', lineHeight:1.7 }}>
-        💡 Reserve o campo aqui e pague ao admin no servidor. O contrato dura 7 dias, mesmo ciclo do gado. Campos seguem as mesmas regras de capacidade: 3 bezerros/ha, 2 garrotes/ha, 1 boi/ha.
-      </div>
+      {/* ── ABA CAMPOS ─────────────────────────────────────────────────────── */}
+      {(user?.role !== 'admin' || abaAdmin === 'campos') && (<>
 
-      {/* Grid de campos */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 }}>
-        {campos.map(c => {
-          const meuCampo = meus.find(a => a.campo_id === c.id)
-          return (
-            <div key={c.id} style={{ background:T.card, border:`1px solid ${c.meu?'#2a5a12':c.ocupado?T.border:'#2a3a18'}`, borderRadius:16, overflow:'hidden', transition:'all .25s' }}
-              onMouseEnter={e=>{if(!c.ocupado&&!c.meu)e.currentTarget.style.borderColor='#4a6a28'}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=c.meu?'#2a5a12':c.ocupado?T.border:'#2a3a18'}}>
-              <div style={{ height:150, overflow:'hidden', position:'relative', background:'#0a1208' }}>
-                <img src={c.foto_url} alt={c.nome} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.65)', transition:'transform .4s' }}
-                  onMouseEnter={e=>e.target.style.transform='scale(1.06)'}
-                  onMouseLeave={e=>e.target.style.transform='scale(1)'}
-                  onError={e=>e.target.style.display='none'}/>
-                <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.7),transparent 50%)' }}/>
-                <div style={{ position:'absolute', top:10, left:10, display:'flex', gap:6 }}>
-                  <span style={{ background:'rgba(10,18,8,.85)', border:'1px solid #2a4a18', color:'#6ab840', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>
-                    {c.ha}ha
-                  </span>
-                  {c.meu && <span style={{ background:'rgba(10,42,10,.9)', border:'1px solid #2a5a12', color:'#4ad4a0', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>✓ Seu</span>}
-                  {c.ocupado && !c.meu && <span style={{ background:'rgba(42,10,10,.9)', border:'1px solid #6a1818', color:'#e06060', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>Ocupado</span>}
+        {/* Meus aluguéis ativos (jogador) */}
+        {meus.length > 0 && user?.role !== 'admin' && (
+          <div style={{ background:T.card, border:'1px solid #2a5a12', borderRadius:14, padding:18, marginBottom:20 }}>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:'#4ad4a0', marginBottom:12 }}>Seus pastos ativos</div>
+            {meus.map(a => (
+              <div key={a.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:`1px solid ${T.border}`, fontSize:13 }}>
+                <div>
+                  <div style={{ fontWeight:600, color:T.text }}>{a.campo_nome}</div>
+                  <div style={{ fontSize:11, color:T.textMuted }}>{a.ha_alugado}ha · válido até {new Date(a.valido_ate).toLocaleDateString('pt-BR')}</div>
                 </div>
-                <div style={{ position:'absolute', bottom:10, left:12, right:12 }}>
-                  <div style={{ fontSize:15, fontWeight:700, color:'#fff', fontFamily:"'Playfair Display',serif" }}>{c.nome}</div>
-                  <div style={{ fontSize:11, color:'rgba(255,255,255,.6)' }}>{c.regiao}</div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+                  <span style={{ color:'#6ab840', fontWeight:700, fontFamily:"'Playfair Display',serif" }}>${fmt(a.valor_semana||0)}</span>
+                  <span style={{
+                    fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600,
+                    background: a.status_pagamento==='pago' ? '#0a2a1a' : '#3a1800',
+                    color: a.status_pagamento==='pago' ? '#4ad4a0' : '#d08020',
+                    border: `1px solid ${a.status_pagamento==='pago'?'#1a6a4a':'#6a3800'}`
+                  }}>{a.status_pagamento==='pago' ? '✓ Pago' : '⏳ Pagamento pendente'}</span>
                 </div>
               </div>
-              <div style={{ padding:'14px 16px' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:14 }}>
-                  {[['🐄',`${c.cap_bezerros} bzerr.`],['🐂',`${c.cap_garrotes} garr.`],['🐃',`${c.cap_bois} bois`]].map(([e,v]) => (
-                    <div key={v} style={{ background:T.inputBg, borderRadius:8, padding:'6px 4px', textAlign:'center', border:`1px solid ${T.border}` }}>
-                      <div style={{ fontSize:14 }}>{e}</div>
-                      <div style={{ fontSize:10, color:T.textMuted }}>{v}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                  <div>
-                    <div style={{ fontSize:20, fontWeight:800, color:'#6ab840', fontFamily:"'Playfair Display',serif" }}>${fmt(c.preco_semana)}</div>
-                    <div style={{ fontSize:10, color:T.textMuted }}>por semana</div>
+            ))}
+          </div>
+        )}
+
+        {/* Info */}
+        <div style={{ background:'rgba(42,24,0,.3)', border:`1px solid ${T.border}`, borderRadius:12, padding:'12px 16px', marginBottom:20, fontSize:12, color:'#a08040', lineHeight:1.7 }}>
+          💡 Reserve o campo e pague ao admin no servidor. Contrato: 7 dias. Capacidade: 3 bezerros/ha, 2 garrotes/ha, 1 boi/ha.
+        </div>
+
+        {/* Grid campos */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 }}>
+          {campos.map(c => {
+            const meuCampo = meus.find(a => a.campo_id === c.id)
+            const borderColor = c.meu ? '#2a5a12' : c.ocupado ? T.border : '#2a3a18'
+            return (
+              <div key={c.id} style={{ background:T.card, border:`1px solid ${borderColor}`, borderRadius:16, overflow:'hidden', transition:'all .25s' }}
+                onMouseEnter={e=>{if(!c.ocupado&&!c.meu)e.currentTarget.style.borderColor='#4a6a28'}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=borderColor}}>
+                <div style={{ height:150, overflow:'hidden', position:'relative', background:'#0a1208' }}>
+                  <img src={FOTOS[c.id]} alt={c.nome} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.65)', transition:'transform .4s' }}
+                    onMouseEnter={e=>e.target.style.transform='scale(1.06)'}
+                    onMouseLeave={e=>e.target.style.transform='scale(1)'}
+                    onError={e=>e.target.style.display='none'}/>
+                  <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.7),transparent 50%)' }}/>
+                  <div style={{ position:'absolute', top:10, left:10, display:'flex', gap:6, flexWrap:'wrap' }}>
+                    <span style={{ background:'rgba(10,18,8,.85)', border:'1px solid #2a4a18', color:'#6ab840', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>{c.ha}ha</span>
+                    {c.meu && <span style={{ background:'rgba(10,42,10,.9)', border:'1px solid #2a5a12', color:'#4ad4a0', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>✓ Seu</span>}
+                    {c.meu && c.meu_pagamento==='pendente' && <span style={{ background:'rgba(60,30,0,.9)', border:'1px solid #6a3800', color:'#d08020', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>⏳ Pag. pendente</span>}
+                    {c.meu && c.meu_pagamento==='pago' && <span style={{ background:'rgba(10,42,10,.9)', border:'1px solid #1a6a4a', color:'#4ad4a0', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>✓ Pago</span>}
+                    {c.ocupado && !c.meu && <span style={{ background:'rgba(42,10,10,.9)', border:'1px solid #6a1818', color:'#e06060', fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600 }}>Ocupado</span>}
                   </div>
-                  {user?.role === 'admin' ? (
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      <select onChange={async e => {
-                        if (!e.target.value) return
-                        await api('/api/pastagem', { method:'PATCH', body: JSON.stringify({
-                          action:'associar', campo_id: c.id,
-                          jogador_id: e.target.value,
-                          jogador_nome: e.target.options[e.target.selectedIndex].text
-                        })})
-                        notify(`✓ Campo associado!`)
-                        load()
-                        e.target.value = ''
-                      }} style={{ fontSize:11, padding:'5px 8px', background:T.inputBg, border:`1px solid ${T.border}`, borderRadius:8, color:T.text, cursor:'pointer', fontFamily:'inherit' }}>
-                        <option value="">Associar jogador...</option>
-                        {(dados?.jogadores||[]).map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
-                      </select>
-                      {c.ocupado && (
-                        <button onClick={async () => {
-                          await api('/api/pastagem', { method:'PATCH', body: JSON.stringify({ action:'desassociar', campo_id: c.id }) })
-                          notify('Campo liberado!')
+                  <div style={{ position:'absolute', bottom:10, left:12, right:12 }}>
+                    <div style={{ fontSize:15, fontWeight:700, color:'#fff', fontFamily:"'Playfair Display',serif" }}>{c.nome}</div>
+                    <div style={{ fontSize:11, color:'rgba(255,255,255,.6)' }}>{c.regiao}</div>
+                  </div>
+                </div>
+                <div style={{ padding:'14px 16px' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:14 }}>
+                    {[['🐄',`${c.cap_bezerros} bzerr.`],['🐂',`${c.cap_garrotes} garr.`],['🐃',`${c.cap_bois} bois`]].map(([e,v])=>(
+                      <div key={v} style={{ background:T.inputBg, borderRadius:8, padding:'6px 4px', textAlign:'center', border:`1px solid ${T.border}` }}>
+                        <div style={{ fontSize:14 }}>{e}</div>
+                        <div style={{ fontSize:10, color:T.textMuted }}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <div>
+                      <div style={{ fontSize:20, fontWeight:800, color:'#6ab840', fontFamily:"'Playfair Display',serif" }}>${fmt(c.preco_semana)}</div>
+                      <div style={{ fontSize:10, color:T.textMuted }}>por semana</div>
+                    </div>
+                    {user?.role === 'admin' ? (
+                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                        {c.ocupado && (
+                          <div style={{ fontSize:11, color:T.textMuted, marginBottom:2 }}>
+                            🔒 {c.inquilino}
+                            {c.status_pagamento === 'pendente' && <span style={{ color:'#d08020', marginLeft:6 }}>⏳ pend.</span>}
+                            {c.status_pagamento === 'pago' && <span style={{ color:'#4ad4a0', marginLeft:6 }}>✓ pago</span>}
+                          </div>
+                        )}
+                        <select onChange={async e => {
+                          if (!e.target.value) return
+                          await api('/api/pastagem', { method:'PATCH', body: JSON.stringify({
+                            action:'associar', campo_id: c.id,
+                            jogador_id: e.target.value,
+                            jogador_nome: e.target.options[e.target.selectedIndex].text
+                          })})
+                          notify(`✓ Campo associado! Fatura pendente gerada.`)
+                          sounds?.success()
                           load()
-                        }} style={{ padding:'4px 10px', background:'rgba(100,20,20,.4)', border:'1px solid #6a1818', color:'#e06060', borderRadius:8, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
-                          Desassociar
-                        </button>
-                      )}
-                    </div>
-                  ) : c.meu ? (
-                    <div style={{ fontSize:12, color:'#4ad4a0', fontWeight:600 }}>
-                      Válido até {new Date(meuCampo?.valido_ate).toLocaleDateString('pt-BR')}
-                    </div>
-                  ) : c.ocupado ? (
-                    <div style={{ fontSize:12, color:T.textMuted, fontStyle:'italic' }}>
-                      {c.inquilino ? `🔒 ${c.inquilino}` : 'Indisponível'}
-                    </div>
-                  ) : (
-                    <button onClick={() => setAlugando(c)}
-                      style={{ padding:'8px 16px', background:'linear-gradient(135deg,#1a4a10,#3a7a20)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-                      Reservar
-                    </button>
-                  )}
+                          e.target.value = ''
+                        }} style={{ fontSize:11, padding:'5px 8px', background:T.inputBg, border:`1px solid ${T.border}`, borderRadius:8, color:T.text, cursor:'pointer', fontFamily:'inherit' }}>
+                          <option value="">Associar jogador...</option>
+                          {(dados?.jogadores||[]).map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+                        </select>
+                        {c.ocupado && (
+                          <button onClick={async()=>{
+                            await api('/api/pastagem',{method:'PATCH',body:JSON.stringify({action:'desassociar',campo_id:c.id})})
+                            notify('Campo liberado.')
+                            load()
+                          }} style={{ padding:'4px 10px', background:'rgba(100,20,20,.4)', border:'1px solid #6a1818', color:'#e06060', borderRadius:8, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                            Desassociar
+                          </button>
+                        )}
+                      </div>
+                    ) : c.meu ? (
+                      <div style={{ textAlign:'right' }}>
+                        <div style={{ fontSize:11, color:'#4ad4a0', fontWeight:600 }}>Válido até {new Date(meuCampo?.valido_ate).toLocaleDateString('pt-BR')}</div>
+                      </div>
+                    ) : c.ocupado ? (
+                      <div style={{ fontSize:12, color:T.textMuted, fontStyle:'italic' }}>🔒 {c.inquilino || 'Indisponível'}</div>
+                    ) : (
+                      <button onClick={()=>setAlugando(c)} style={{ padding:'8px 16px', background:'linear-gradient(135deg,#1a4a10,#3a7a20)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                        Reservar
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      </>)}
 
       {/* Modal confirmar aluguel */}
       {alugando && (
@@ -2591,12 +2700,12 @@ export function PastagemPage({ T, user, api, notify, sounds }) {
             </div>
             <div style={{ background:T.inputBg, borderRadius:12, padding:16, marginBottom:20, border:`1px solid ${T.border}` }}>
               {[
-                ['Campo', alugando.nome],
-                ['Região', alugando.regiao],
-                ['Área', `${alugando.ha} hectares`],
+                ['Campo',      alugando.nome],
+                ['Região',     alugando.regiao],
+                ['Área',       `${alugando.ha} hectares`],
                 ['Capacidade', `${alugando.cap_garrotes} garrotes / ${alugando.cap_bois} bois`],
-                ['Duração', '7 dias'],
-                ['Valor', `$${fmt(alugando.preco_semana)}`],
+                ['Duração',    '7 dias'],
+                ['Valor',      `$${fmt(alugando.preco_semana)}`],
               ].map(([l,v]) => (
                 <div key={l} style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:8 }}>
                   <span style={{ color:T.textMuted }}>{l}</span>
@@ -2604,7 +2713,7 @@ export function PastagemPage({ T, user, api, notify, sounds }) {
                 </div>
               ))}
               <div style={{ fontSize:11, color:'#a08040', marginTop:8, padding:'8px 0', borderTop:`1px solid ${T.border}` }}>
-                ⚠ Após reservar, pague o valor ao admin no servidor para ativar o contrato.
+                ⚠ Após reservar, pague ao admin no servidor para ativar o contrato.
               </div>
             </div>
             <div style={{ display:'flex', gap:10 }}>
