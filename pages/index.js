@@ -516,6 +516,12 @@ export default function App() {
     const h = {'Content-Type':'application/json'}
     if(token) h['Authorization']=`Bearer ${token}`
     const r = await fetch(path,{...opts,headers:h})
+    if(r.status===401){
+      localStorage.removeItem('gvrpnl_token')
+      localStorage.removeItem('gvrpnl_user')
+      window.location.reload()
+      return {}
+    }
     return r.json()
   },[token])
 
