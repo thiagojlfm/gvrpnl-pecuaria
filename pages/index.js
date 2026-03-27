@@ -33,26 +33,29 @@ const sounds = {
   error: () => playTone(200, 0.3, 'sawtooth', 0.06),
 }
 
-// ─── CSS Globals — Terminal Brutalista ────────────────────────────────────────
+// ─── CSS Globals — Leilão de Gado Premium ────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Mono:wght@400;500;700&display=swap');
   :root{
-    --bg:#0B0E14;--panel:#0F1218;--card:#15181E;--card2:#1C2028;--input-bg:#0d1017;
-    --border:#2A2F3A;--border2:#3A4050;
-    --rust:#C84B31;--rust2:#8A3020;--rust3:#3A1408;
-    --grn:#00E054;--grn2:#004D1C;
-    --red:#FF3333;--red2:#5A0A0A;
-    --ice:#C8D0D8;--ice2:#7A8490;--ice3:#3A4048;
-    --font-disp:'Bebas Neue',sans-serif;
-    --font-mono:'JetBrains Mono',monospace;
+    --bg:#150f0c;--panel:#1e1612;--card:#1e1612;--card2:#261c17;--input-bg:#130d0a;
+    --border:#36251e;--border2:#523a2f;
+    --rust:#c28c46;--rust2:#8a602c;--rust3:#3d2b24;
+    --gold:#c28c46;--gold-dim:#8a602c;
+    --grn:#4ade80;--grn2:#14532d;
+    --red:#f87171;--red2:#450a0a;
+    --ice:#eaddcf;--ice2:#a6968a;--ice3:#5c4a42;
+    --font-disp:'Playfair Display',serif;
+    --font-mono:'DM Mono',monospace;
+    --font-title:'Playfair Display',serif;
+    --font-data:'DM Mono',monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:var(--font-mono);background:var(--bg);color:var(--ice);-webkit-font-smoothing:antialiased}
   ::-webkit-scrollbar{width:4px;height:4px}
   ::-webkit-scrollbar-track{background:var(--bg)}
-  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:0}
-  ::-webkit-scrollbar-thumb:hover{background:var(--rust2)}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--gold-dim)}
   @keyframes fadeSlideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
@@ -72,35 +75,35 @@ const CSS = `
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 `
 
-// ─── Theme — mapeado para CSS vars (mantém compatibilidade com T.xxx) ─────────
+// ─── Theme — Leilão de Gado Premium ──────────────────────────────────────────
 const D = {
-  bg:'#0B0E14', panel:'#0F1218', card:'#15181E', cardHover:'#1C2028',
-  border:'#2A2F3A', border2:'#3A4050',
-  gold:'#C84B31', goldLight:'#e86050', goldDark:'#8A3020',
-  cream:'#C8D0D8', creamDim:'#7A8490', creamMuted:'#3A4048',
-  green:'#00E054', greenDark:'#004D1C', red:'#FF3333', amber:'#C84B31',
-  inputBg:'#0d1017', navBg:'#0F1218', isDark:true,
-  text:'#C8D0D8', textDim:'#7A8490', textMuted:'#3A4048',
+  bg:'#150f0c', panel:'#1e1612', card:'#1e1612', cardHover:'#261c17',
+  border:'#36251e', border2:'#523a2f',
+  gold:'#c28c46', goldLight:'#d4a96a', goldDark:'#8a602c',
+  cream:'#eaddcf', creamDim:'#a6968a', creamMuted:'#5c4a42',
+  green:'#4ade80', greenDark:'#14532d', red:'#f87171', amber:'#c28c46',
+  inputBg:'#130d0a', navBg:'#1e1612', isDark:true,
+  text:'#eaddcf', textDim:'#a6968a', textMuted:'#5c4a42',
 }
 const L = {
-  bg:'#0B0E14', panel:'#0F1218', card:'#15181E', cardHover:'#1C2028',
-  border:'#2A2F3A', border2:'#3A4050',
-  gold:'#C84B31', goldLight:'#e86050', goldDark:'#8A3020',
-  cream:'#C8D0D8', creamDim:'#7A8490', creamMuted:'#3A4048',
-  green:'#00E054', greenDark:'#004D1C', red:'#FF3333', amber:'#C84B31',
-  inputBg:'#0d1017', navBg:'#0F1218', isDark:true,
-  text:'#C8D0D8', textDim:'#7A8490', textMuted:'#3A4048',
+  bg:'#150f0c', panel:'#1e1612', card:'#1e1612', cardHover:'#261c17',
+  border:'#36251e', border2:'#523a2f',
+  gold:'#c28c46', goldLight:'#d4a96a', goldDark:'#8a602c',
+  cream:'#eaddcf', creamDim:'#a6968a', creamMuted:'#5c4a42',
+  green:'#4ade80', greenDark:'#14532d', red:'#f87171', amber:'#c28c46',
+  inputBg:'#130d0a', navBg:'#1e1612', isDark:true,
+  text:'#eaddcf', textDim:'#a6968a', textMuted:'#5c4a42',
 }
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 function Badge({type, children}) {
-  const map={ok:{bg:'#00200E',color:'#00E054',border:'#004D1C'},warn:{bg:'#2A1408',color:'#C84B31',border:'#8A3020'},info:{bg:'#0A0F1E',color:'#5A90D0',border:'#1A3060'},gray:{bg:'#1C2028',color:'#7A8490',border:'#3A4048'},purple:{bg:'#150A28',color:'#9060E0',border:'#3A2060'},danger:{bg:'#2A0808',color:'#FF3333',border:'#5A0A0A'},amber:{bg:'#1E1008',color:'#C84B31',border:'#8A3020'},gold:{bg:'#1C2028',color:'#C8D0D8',border:'#3A4048'},nl:{bg:'#0A0F1E',color:'#5A90D0',border:'#1A3060'}}
+  const map={ok:{bg:'#002010',color:'#4ade80',border:'#14532d'},warn:{bg:'#2a1a08',color:'#c28c46',border:'#8a602c'},info:{bg:'#0a0f1e',color:'#7ab0e0',border:'#1a3060'},gray:{bg:'#261c17',color:'#a6968a',border:'#5c4a42'},purple:{bg:'#150a28',color:'#9060e0',border:'#3a2060'},danger:{bg:'#2a0808',color:'#f87171',border:'#450a0a'},amber:{bg:'#2a1a08',color:'#c28c46',border:'#8a602c'},gold:{bg:'#261c17',color:'#eaddcf',border:'#5c4a42'},nl:{bg:'#0a0f1e',color:'#7ab0e0',border:'#1a3060'}}
   const s=map[type]||map.gray
-  return <span style={{background:s.bg,color:s.color,border:`1px solid ${s.border}`,fontSize:10,padding:'2px 8px',borderRadius:2,fontWeight:700,whiteSpace:'nowrap',display:'inline-block',letterSpacing:'2px',fontFamily:'var(--font-mono)',textTransform:'uppercase'}}>{children}</span>
+  return <span style={{background:s.bg,color:s.color,border:`1px solid ${s.border}`,fontSize:10,padding:'2px 8px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap',display:'inline-block',letterSpacing:'1px',fontFamily:'var(--font-data)',textTransform:'uppercase'}}>{children}</span>
 }
 
 function Card({children, style, glow, hover=true, T}) {
-  return <div className={hover?'card-hover':''} style={{background:'var(--card)',border:`1px solid ${glow?'var(--rust2)':'var(--border)'}`,borderLeft:glow?'3px solid var(--rust)':'1px solid var(--border)',borderRadius:0,padding:20,marginBottom:16,position:'relative',overflow:'hidden',clipPath:glow?'polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,0 100%)':'none',...style}} onMouseEnter={hover?e=>{e.currentTarget.style.borderColor='var(--rust2)'}:undefined} onMouseLeave={hover?e=>{e.currentTarget.style.borderColor=glow?'var(--rust2)':'var(--border)'}:undefined}>
+  return <div className={hover?'card-hover':''} style={{background:'var(--card)',border:`1px solid ${glow?'var(--rust2)':'var(--border)'}`,borderLeft:glow?'3px solid var(--rust)':'1px solid var(--border)',borderRadius:6,padding:20,marginBottom:16,position:'relative',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,.5)',...style}} onMouseEnter={hover?e=>{e.currentTarget.style.borderColor='var(--rust2)'}:undefined} onMouseLeave={hover?e=>{e.currentTarget.style.borderColor=glow?'var(--rust2)':'var(--border)'}:undefined}>
     {glow&&<div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'var(--rust)',opacity:.6}}/>}
     {children}
   </div>
@@ -110,66 +113,66 @@ function SectionTitle({icon, title, sub, T}) {
   return <div style={{marginBottom:24,paddingBottom:14,borderBottom:'1px solid var(--border)'}}>
     <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
       <span style={{fontSize:18}}>{icon}</span>
-      <h1 style={{fontFamily:'var(--font-disp)',fontSize:28,letterSpacing:'3px',color:'var(--ice)',fontWeight:400,lineHeight:1}}>{String(title).toUpperCase()}</h1>
+      <h1 style={{fontFamily:'var(--font-disp)',fontSize:28,letterSpacing:'1px',color:'var(--ice)',fontWeight:700,lineHeight:1}}>{title}</h1>
     </div>
-    {sub&&<p style={{fontSize:11,color:'var(--ice3)',marginLeft:28,letterSpacing:'1px',fontWeight:300,fontFamily:'var(--font-mono)'}}>// {sub}</p>}
+    {sub&&<p style={{fontSize:11,color:'var(--ice3)',marginLeft:28,letterSpacing:'0.5px',fontWeight:400,fontFamily:'var(--font-data)'}}>{sub}</p>}
   </div>
 }
 
 function Metric({label, value, sub, color, T, icon}) {
-  return <div style={{background:'var(--input-bg)',border:'1px solid var(--border)',borderTop:`2px solid ${color||'var(--border2)'}`,borderRadius:0,padding:'14px 16px',position:'relative',overflow:'hidden'}}>
-    <div style={{fontSize:9,color:'var(--ice3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'3px',fontWeight:400,fontFamily:'var(--font-mono)'}}>{label}</div>
-    <div style={{fontSize:26,fontWeight:700,color:color||'var(--ice)',fontFamily:'var(--font-disp)',letterSpacing:'1px',lineHeight:1}}>{value}</div>
+  return <div style={{background:'var(--input-bg)',border:'1px solid var(--border)',borderTop:`2px solid ${color||'var(--border2)'}`,borderRadius:4,padding:'14px 16px',position:'relative',overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,.4)'}}>
+    <div style={{fontSize:9,color:'var(--ice3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'2px',fontWeight:500,fontFamily:'var(--font-data)'}}>{label}</div>
+    <div style={{fontSize:24,fontWeight:700,color:color||'var(--ice)',fontFamily:'var(--font-data)',letterSpacing:'0.5px',lineHeight:1}}>{value}</div>
     {sub&&<div style={{fontSize:10,color:'var(--ice3)',marginTop:4,fontWeight:300,letterSpacing:'1px'}}>{sub}</div>}
   </div>
 }
 
 function Inp({label, T, hint, ...props}) {
   return <div style={{display:'flex',flexDirection:'column',gap:6}}>
-    {label&&<label style={{fontSize:10,color:'var(--ice3)',fontWeight:400,textTransform:'uppercase',letterSpacing:'3px',fontFamily:'var(--font-mono)'}}>{label}</label>}
-    <input {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:0,padding:'10px 14px',fontSize:13,color:'var(--ice)',fontFamily:'var(--font-mono)',outline:'none',transition:'border-color .1s',...props.style}} onFocus={e=>{e.target.style.borderColor='var(--rust)';props.onFocus&&props.onFocus(e)}} onBlur={e=>{e.target.style.borderColor='var(--border2)';props.onBlur&&props.onBlur(e)}}/>
+    {label&&<label style={{fontSize:10,color:'var(--ice3)',fontWeight:500,textTransform:'uppercase',letterSpacing:'2px',fontFamily:'var(--font-data)'}}>{label}</label>}
+    <input {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:4,padding:'10px 14px',fontSize:13,color:'var(--ice)',fontFamily:'var(--font-mono)',outline:'none',transition:'border-color .1s',...props.style}} onFocus={e=>{e.target.style.borderColor='var(--rust)';props.onFocus&&props.onFocus(e)}} onBlur={e=>{e.target.style.borderColor='var(--border2)';props.onBlur&&props.onBlur(e)}}/>
     {hint&&<div style={{fontSize:10,color:'var(--ice3)',letterSpacing:'1px',fontWeight:300}}>{hint}</div>}
   </div>
 }
 
 function Sel({label, children, T, ...props}) {
   return <div style={{display:'flex',flexDirection:'column',gap:6}}>
-    {label&&<label style={{fontSize:10,color:'var(--ice3)',fontWeight:400,textTransform:'uppercase',letterSpacing:'3px',fontFamily:'var(--font-mono)'}}>{label}</label>}
-    <select {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:0,padding:'10px 14px',fontSize:13,color:'var(--ice)',fontFamily:'var(--font-mono)',outline:'none',cursor:'pointer',...props.style}}>{children}</select>
+    {label&&<label style={{fontSize:10,color:'var(--ice3)',fontWeight:500,textTransform:'uppercase',letterSpacing:'2px',fontFamily:'var(--font-data)'}}>{label}</label>}
+    <select {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:4,padding:'10px 14px',fontSize:13,color:'var(--ice)',fontFamily:'var(--font-mono)',outline:'none',cursor:'pointer',...props.style}}>{children}</select>
   </div>
 }
 
 function Btn({children, onClick, v='primary', style, disabled, T, sound=true}) {
   const vmap={
-    primary:{bg:'transparent',border:'2px solid var(--ice3)',color:'var(--ice)',hbg:'var(--ice3)',hc:'var(--bg)'},
+    primary:{bg:'transparent',border:'2px solid var(--border2)',color:'var(--ice)',hbg:'var(--border2)',hc:'var(--bg)'},
     ghost:{bg:'transparent',border:'1px solid var(--border2)',color:'var(--ice2)',hbg:'var(--border2)',hc:'var(--bg)'},
-    danger:{bg:'var(--red2)',border:'2px solid var(--red)',color:'var(--red)',hbg:'var(--red)',hc:'#fff',shadow:'inset 0 -3px 0 rgba(0,0,0,.5)'},
-    amber:{bg:'var(--rust3)',border:'1px solid var(--rust2)',color:'var(--rust)',hbg:'var(--rust2)',hc:'#fff'},
+    danger:{bg:'var(--red2)',border:'1px solid var(--red)',color:'var(--red)',hbg:'var(--red)',hc:'#fff',shadow:'0 2px 8px rgba(0,0,0,.4)'},
+    amber:{bg:'var(--rust3)',border:'1px solid var(--rust2)',color:'var(--rust)',hbg:'var(--rust2)',hc:'#000'},
     purple:{bg:'#150a28',border:'1px solid #3a2060',color:'#9060e0',hbg:'#3a2060',hc:'#fff'},
-    red:{bg:'var(--red2)',border:'2px solid var(--red)',color:'var(--red)',hbg:'var(--red)',hc:'#fff',shadow:'inset 0 -3px 0 rgba(0,0,0,.5)'},
-    green:{bg:'var(--grn2)',border:'2px solid var(--grn)',color:'var(--grn)',hbg:'var(--grn)',hc:'#000'},
+    red:{bg:'var(--red2)',border:'1px solid var(--red)',color:'var(--red)',hbg:'var(--red)',hc:'#fff',shadow:'0 2px 8px rgba(0,0,0,.4)'},
+    green:{bg:'var(--grn2)',border:'1px solid var(--grn)',color:'var(--grn)',hbg:'var(--grn)',hc:'#000'},
   }
   const c=vmap[v]||vmap.primary
-  return <button style={{background:c.bg,border:c.border,color:c.color,borderRadius:0,fontSize:13,fontWeight:700,cursor:disabled?'not-allowed':'pointer',padding:'10px 20px',fontFamily:'var(--font-disp)',letterSpacing:'3px',textTransform:'uppercase',opacity:disabled?.4:1,boxShadow:c.shadow||'none',outline:'none',...style}} onClick={()=>{if(sound&&!disabled) sounds.click();onClick&&onClick()}} disabled={disabled} onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background=c.hbg;e.currentTarget.style.color=c.hc}}} onMouseLeave={e=>{e.currentTarget.style.background=c.bg;e.currentTarget.style.color=c.color}} onMouseDown={e=>{if(!disabled)e.currentTarget.style.transform='translate(2px,2px)'}} onMouseUp={e=>{e.currentTarget.style.transform='none'}}>{children}</button>
+  return <button style={{background:c.bg,border:c.border,color:c.color,borderRadius:6,fontSize:13,fontWeight:600,cursor:disabled?'not-allowed':'pointer',padding:'10px 20px',fontFamily:'var(--font-title)',letterSpacing:'0.5px',opacity:disabled?.4:1,boxShadow:c.shadow||'none',outline:'none',...style}} onClick={()=>{if(sound&&!disabled) sounds.click();onClick&&onClick()}} disabled={disabled} onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background=c.hbg;e.currentTarget.style.color=c.hc}}} onMouseLeave={e=>{e.currentTarget.style.background=c.bg;e.currentTarget.style.color=c.color}} onMouseDown={e=>{if(!disabled)e.currentTarget.style.transform='translate(2px,2px)'}} onMouseUp={e=>{e.currentTarget.style.transform='none'}}>{children}</button>
 }
 
 function Tbl({headers, rows, T}) {
-  return <div style={{overflowX:'auto',border:'1px solid var(--border)',borderRadius:0,backgroundImage:'linear-gradient(rgba(58,64,72,.25) 1px,transparent 1px),linear-gradient(90deg,rgba(58,64,72,.25) 1px,transparent 1px)',backgroundSize:'24px 24px'}}>
+  return <div style={{overflowX:'auto',border:'1px solid var(--border)',borderRadius:6,backgroundImage:'linear-gradient(rgba(54,37,30,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(54,37,30,.3) 1px,transparent 1px)',backgroundSize:'24px 24px',boxShadow:'0 2px 12px rgba(0,0,0,.4)'}}>
     <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-      <thead><tr style={{background:'var(--card2)'}}>{headers.map((h,i)=><th key={i} style={{textAlign:'left',padding:'10px 14px',fontSize:9,fontWeight:400,color:'var(--ice3)',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap',textTransform:'uppercase',letterSpacing:'3px',fontFamily:'var(--font-mono)'}}>{h}</th>)}</tr></thead>
+      <thead><tr style={{background:'var(--card2)'}}>{headers.map((h,i)=><th key={i} style={{textAlign:'left',padding:'10px 14px',fontSize:9,fontWeight:600,color:'var(--ice3)',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap',textTransform:'uppercase',letterSpacing:'2px',fontFamily:'var(--font-data)'}}>{h}</th>)}</tr></thead>
       <tbody>
         {rows.map((row,i)=><tr key={i} style={{borderBottom:'1px solid var(--border)',transition:'background .1s'}} onMouseEnter={e=>e.currentTarget.style.background='var(--input-bg)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-          {row.map((cell,j)=><td key={j} style={{padding:'11px 14px',color:'var(--ice)',verticalAlign:'middle',fontFamily:'var(--font-mono)',fontSize:12}}>{cell}</td>)}
+          {row.map((cell,j)=><td key={j} style={{padding:'11px 14px',color:'var(--ice)',verticalAlign:'middle',fontFamily:'var(--font-data)',fontSize:12}}>{cell}</td>)}
         </tr>)}
-        {rows.length===0&&<tr><td colSpan={headers.length} style={{padding:32,textAlign:'center',color:'var(--ice3)',fontSize:12,letterSpacing:'2px',fontFamily:'var(--font-mono)'}}>// Nenhum registro encontrado</td></tr>}
+        {rows.length===0&&<tr><td colSpan={headers.length} style={{padding:32,textAlign:'center',color:'var(--ice3)',fontSize:12,letterSpacing:'1px',fontFamily:'var(--font-data)'}}>Nenhum registro encontrado</td></tr>}
       </tbody>
     </table>
   </div>
 }
 
 function Alrt({type, children}) {
-  const s={warn:{bg:'#1E0E04',color:'#C84B31',border:'#8A3020'},success:{bg:'#002410',color:'#00E054',border:'#004D1C'},info:{bg:'#050F28',color:'#5A90D0',border:'#103060'},danger:{bg:'#2A0808',color:'#FF3333',border:'#5A0A0A'}}[type]||{bg:'#1C2028',color:'#7A8490',border:'#3A4048'}
-  return <div style={{background:s.bg,color:s.color,borderLeft:`3px solid ${s.border}`,padding:'10px 14px',borderRadius:0,fontSize:12,marginBottom:14,lineHeight:1.6,fontFamily:'var(--font-mono)',letterSpacing:'.5px'}}>{children}</div>
+  const s={warn:{bg:'#2a1a08',color:'#c28c46',border:'#8a602c'},success:{bg:'#002010',color:'#4ade80',border:'#14532d'},info:{bg:'#050f28',color:'#7ab0e0',border:'#103060'},danger:{bg:'#2a0808',color:'#f87171',border:'#450a0a'}}[type]||{bg:'#261c17',color:'#a6968a',border:'#5c4a42'}
+  return <div style={{background:s.bg,color:s.color,borderLeft:`3px solid ${s.border}`,padding:'10px 14px',borderRadius:4,fontSize:12,marginBottom:14,lineHeight:1.6,fontFamily:'var(--font-mono)',letterSpacing:'.5px'}}>{children}</div>
 }
 function faseBadge(f) {
   const m={bezerro:'info',garrote:'warn',boi:'gray',abatido:'gold'}
@@ -200,7 +203,7 @@ function CountdownRing({dataFase, T, size=48}) {
   const r = (size/2) - 4
   const circ = 2 * Math.PI * r
   const dash = pct * circ
-  const color = days<=1?'#e06060':days<=3?'#d08020':T.gold
+  const color = days<=1?'#f87171':days<=3?'#c28c46':T.gold
 
   return <div style={{position:'relative',width:size,height:size,flexShrink:0}}>
     <svg width={size} height={size} style={{transform:'rotate(-90deg)'}}>
@@ -419,7 +422,7 @@ function Sidebar({page, setPage, user, T, collapsed}) {
   return <div style={{width:collapsed?64:200,flexShrink:0,background:T.navBg,borderRight:`1px solid ${T.border}`,display:'flex',flexDirection:'column',padding:'12px 8px',gap:4,transition:'width .25s ease',overflowX:'hidden'}}>
     {items.map(n=>{
       const active = page===n.id
-      return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id)}} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:10,border:'none',cursor:'pointer',background:active?`rgba(200,146,42,.15)`:'transparent',color:active?T.gold:T.textMuted,transition:'all .15s',whiteSpace:'nowrap',fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active?600:400,textAlign:'left'}} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=T.inputBg;e.currentTarget.style.color=T.text}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.color=T.textMuted}}}>
+      return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id)}} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:8,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.15)`:'transparent',color:active?T.gold:T.textMuted,transition:'all .15s',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:active?600:400,textAlign:'left'}} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=T.inputBg;e.currentTarget.style.color=T.text}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.color=T.textMuted}}}>
         <span style={{fontSize:18,flexShrink:0}}>{n.icon}</span>
         {!collapsed&&<span>{n.label}</span>}
         {active&&!collapsed&&<div style={{marginLeft:'auto',width:4,height:4,borderRadius:'50%',background:T.gold}}/>}
@@ -445,7 +448,7 @@ function Drawer({open, onClose, page, setPage, user, T}) {
       </div>
       {items.map(n=>{
         const active = page===n.id
-        return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id);onClose()}} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:10,border:'none',cursor:'pointer',background:active?`rgba(200,146,42,.15)`:'transparent',color:active?T.gold:T.textMuted,transition:'all .15s',fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:active?600:400,textAlign:'left'}}>
+        return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id);onClose()}} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:8,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.15)`:'transparent',color:active?T.gold:T.textMuted,transition:'all .15s',fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:active?600:400,textAlign:'left'}}>
           <span style={{fontSize:20}}>{n.icon}</span>
           <span>{n.label}</span>
           {active&&<div style={{marginLeft:'auto',width:6,height:6,borderRadius:'50%',background:T.gold}}/>}
@@ -709,7 +712,7 @@ export default function App() {
         </div>
 
         {/* Notification Bar */}
-        {notification&&<div style={{background:notifType==='success'?'#0a1a04':'#1a0404',color:notifType==='success'?T.green:'#e06060',padding:'10px 20px',fontSize:13,textAlign:'center',borderBottom:`1px solid ${notifType==='success'?T.greenDark:'#6a1818'}`,fontWeight:500,animation:'fadeIn .3s ease'}}>{notification}</div>}
+        {notification&&<div style={{background:notifType==='success'?'#011a08':'#1a0404',color:notifType==='success'?T.green:'#f87171',padding:'10px 20px',fontSize:13,textAlign:'center',borderBottom:`1px solid ${notifType==='success'?T.greenDark:'#450a0a'}`,fontWeight:500,fontFamily:"'DM Mono',monospace",animation:'fadeIn .3s ease'}}>{notification}</div>}
 
         {/* Page Content */}
         <div key={pageKey} className="page-enter" style={{flex:1,overflowY:'auto',padding:'24px 24px',maxWidth:1200,width:'100%',margin:'0 auto',boxSizing:'border-box'}}>
@@ -760,31 +763,31 @@ export default function App() {
 
           {/* MERCADO */}
           {page==='mercado'&&<>
-            {/* Ticker ao vivo */}
-            <div style={{background:'#0d1017',borderBottom:'2px solid #8A3020',height:28,display:'flex',alignItems:'center',overflow:'hidden',marginBottom:20,marginLeft:-20,marginRight:-20}}>
-              <div style={{background:'var(--rust)',color:'#fff',fontFamily:'var(--font-disp)',fontSize:12,letterSpacing:3,padding:'0 14px',height:'100%',display:'flex',alignItems:'center',flexShrink:0,borderRight:'2px solid #8A3020'}}>PREGAO AO VIVO</div>
+            {/* Ticker ao vivo — PREGÃO */}
+            <div style={{background:'#0a0706',borderBottom:'1px solid #8a602c',height:32,display:'flex',alignItems:'center',overflow:'hidden',marginBottom:20,marginLeft:-20,marginRight:-20}}>
+              <div style={{background:'var(--gold)',color:'#000',fontFamily:'var(--font-data)',fontSize:11,fontWeight:700,letterSpacing:2,padding:'0 16px',height:'100%',display:'flex',alignItems:'center',flexShrink:0,borderRight:'1px solid #8a602c'}}>PREGÃO AO VIVO</div>
               <div style={{overflow:'hidden',flex:1}}>
                 <div style={{display:'flex',animation:'tickerScroll 30s linear infinite'}}>
                   {[
-                    {sym:'BZR',val:`$${fmt(mercado?.precos?.bezerro||800)}`,chg:'GOV.NPC',c:'#7A8490'},
-                    {sym:'GRR',val:`$${fmt(mercado?.precos?.garrote||0)}`,chg:mercado?.precos?.garrote?`+${((mercado.precos.garrote/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:'—',c:'#00E054'},
-                    {sym:'BOI',val:`$${fmt(mercado?.precos?.boi||0)}`,chg:mercado?.precos?.boi?`+${((mercado.precos.boi/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:'—',c:'#00E054'},
-                    {sym:'FGR',val:`$${fmt(mercado?.precos?.abate||0)}`,chg:mercado?.precos?.abate?`+${((mercado.precos.abate/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:'—',c:'#00E054'},
-                    {sym:'RCO',val:`$${mercado?.precos?.precoRacao||2}/KG`,chg:mercado?.precos?.precoRacao>2?'ALTA':'NORMAL',c:mercado?.precos?.precoRacao>2?'#FF3333':'#00E054'},
-                    {sym:'REB',val:`${mercado?.rebanho?.total||0} CAB`,chg:'ATIVO',c:'#7A8490'},
-                    {sym:'MRG',val:`${mercado?.margem||'~30'}%`,chg:'BZR-FGR',c:'#00E054'},
+                    {sym:'BZR',val:`$${fmt(mercado?.precos?.bezerro||800)}`,chg:'GOV.NPC',c:'#a6968a'},
+                    {sym:'GRR',val:`$${fmt(mercado?.precos?.garrote||0)}`,chg:mercado?.precos?.garrote?`+${((mercado.precos.garrote/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:'—',c:'#4ade80'},
+                    {sym:'BOI',val:`$${fmt(mercado?.precos?.boi||0)}`,chg:mercado?.precos?.boi?`+${((mercado.precos.boi/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:'—',c:'#4ade80'},
+                    {sym:'FGR',val:`$${fmt(mercado?.precos?.abate||0)}`,chg:mercado?.precos?.abate?`+${((mercado.precos.abate/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:'—',c:'#4ade80'},
+                    {sym:'RCO',val:`$${mercado?.precos?.precoRacao||2}/KG`,chg:mercado?.precos?.precoRacao>2?'ALTA':'NORMAL',c:mercado?.precos?.precoRacao>2?'#f87171':'#4ade80'},
+                    {sym:'REB',val:`${mercado?.rebanho?.total||0} CAB`,chg:'ATIVO',c:'#a6968a'},
+                    {sym:'MRG',val:`${mercado?.margem||'~30'}%`,chg:'BZR-FGR',c:'#4ade80'},
                   ].concat([
-                    {sym:'BZR',val:`$${fmt(mercado?.precos?.bezerro||800)}`,chg:'GOV.NPC',c:'#7A8490'},
-                    {sym:'GRR',val:`$${fmt(mercado?.precos?.garrote||0)}`,chg:'—',c:'#00E054'},
-                    {sym:'BOI',val:`$${fmt(mercado?.precos?.boi||0)}`,chg:'—',c:'#00E054'},
-                    {sym:'FGR',val:`$${fmt(mercado?.precos?.abate||0)}`,chg:'—',c:'#00E054'},
-                    {sym:'RCO',val:`$${mercado?.precos?.precoRacao||2}/KG`,chg:'',c:'#7A8490'},
-                    {sym:'REB',val:`${mercado?.rebanho?.total||0} CAB`,chg:'ATIVO',c:'#7A8490'},
-                    {sym:'MRG',val:`${mercado?.margem||'~30'}%`,chg:'BZR-FGR',c:'#00E054'},
+                    {sym:'BZR',val:`$${fmt(mercado?.precos?.bezerro||800)}`,chg:'GOV.NPC',c:'#a6968a'},
+                    {sym:'GRR',val:`$${fmt(mercado?.precos?.garrote||0)}`,chg:'—',c:'#4ade80'},
+                    {sym:'BOI',val:`$${fmt(mercado?.precos?.boi||0)}`,chg:'—',c:'#4ade80'},
+                    {sym:'FGR',val:`$${fmt(mercado?.precos?.abate||0)}`,chg:'—',c:'#4ade80'},
+                    {sym:'RCO',val:`$${mercado?.precos?.precoRacao||2}/KG`,chg:'',c:'#a6968a'},
+                    {sym:'REB',val:`${mercado?.rebanho?.total||0} CAB`,chg:'ATIVO',c:'#a6968a'},
+                    {sym:'MRG',val:`${mercado?.margem||'~30'}%`,chg:'BZR-FGR',c:'#4ade80'},
                   ]).map((it,i)=>(
-                    <span key={i} style={{fontSize:11,padding:'0 22px',display:'flex',gap:8,alignItems:'center',borderRight:'1px solid #3A4048',fontFamily:'var(--font-mono)',whiteSpace:'nowrap'}}>
-                      <span style={{color:'#3A4048',fontWeight:300,fontSize:10}}>{it.sym}</span>
-                      <span style={{fontWeight:700,letterSpacing:1,color:'var(--ice)'}}>{it.val}</span>
+                    <span key={i} style={{fontSize:11,padding:'0 20px',display:'flex',gap:8,alignItems:'center',borderRight:'1px solid #36251e',fontFamily:'var(--font-data)',whiteSpace:'nowrap'}}>
+                      <span style={{color:'#5c4a42',fontWeight:400,fontSize:10}}>{it.sym}</span>
+                      <span style={{fontWeight:700,letterSpacing:0.5,color:'var(--ice)'}}>{it.val}</span>
                       <span style={{color:it.c,fontSize:10}}>{it.chg}</span>
                     </span>
                   ))}
@@ -795,12 +798,12 @@ export default function App() {
             {/* Header mercado */}
             <div style={{marginBottom:20,paddingBottom:14,borderBottom:'1px solid var(--border)',display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:12}}>
               <div>
-                <h1 style={{fontFamily:'var(--font-disp)',fontSize:32,letterSpacing:4,color:'var(--ice)',lineHeight:1}}>MERCADO <span style={{color:'var(--rust)'}}>/ COTACOES</span></h1>
-                <p style={{fontSize:11,color:'var(--ice3)',letterSpacing:1,fontFamily:'var(--font-mono)',fontWeight:300,marginTop:4}}>// Precos em tempo real baseados no rebanho ativo do servidor</p>
+                <h1 style={{fontFamily:'var(--font-title)',fontSize:30,letterSpacing:1,color:'var(--ice)',lineHeight:1,fontWeight:700}}>Mercado <span style={{color:'var(--gold)'}}>/ Cotações</span></h1>
+                <p style={{fontSize:11,color:'var(--ice3)',letterSpacing:0.5,fontFamily:'var(--font-data)',fontWeight:400,marginTop:6}}>Preços em tempo real — baseados no rebanho ativo do servidor</p>
               </div>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
-                <div style={{width:6,height:6,borderRadius:'50%',background:'var(--grn)',animation:'blinkDot 1.2s step-end infinite'}}/>
-                <span style={{fontSize:11,color:'var(--grn)',fontWeight:700,letterSpacing:2,fontFamily:'var(--font-mono)'}}>PREGAO ABERTO</span>
+                <div style={{width:7,height:7,borderRadius:'50%',background:'var(--grn)',animation:'blinkDot 1.2s step-end infinite',boxShadow:'0 0 6px #4ade80'}}/>
+                <span style={{fontSize:11,color:'var(--grn)',fontWeight:600,letterSpacing:1,fontFamily:'var(--font-data)'}}>PREGÃO ABERTO</span>
               </div>
             </div>
 
@@ -809,24 +812,25 @@ export default function App() {
               {['bezerro','garrote','boi','abatido'].map(f=>{
                 const imgs={bezerro:'/bezerro.jpg',garrote:'/garrote.jpg',boi:'/boi.jpg',abatido:'/picanha.jpg'}
                 const precoMap={bezerro:mercado?.precos?.bezerro,garrote:mercado?.precos?.garrote,boi:mercado?.precos?.boi,abatido:mercado?.precos?.abate}
-                const origemMap={bezerro:'GOV.NPC — FIXO',garrote:'LIVRE P2P',boi:'LIVRE P2P',abatido:'FRIGORIFICO NPC'}
+                const origemMap={bezerro:'Gov. NPC — Fixo',garrote:'Livre P2P',boi:'Livre P2P',abatido:'Frigorífico NPC'}
                 const isAbate=f==='abatido'
-                return <div key={f} style={{background:'var(--card)',border:`1px solid ${isAbate?'var(--rust2)':'var(--border)'}`,borderRadius:0,overflow:'hidden',transition:'border-color .15s'}} onMouseEnter={e=>{e.currentTarget.style.borderColor=isAbate?'var(--rust)':'var(--rust2)'}} onMouseLeave={e=>{e.currentTarget.style.borderColor=isAbate?'var(--rust2)':'var(--border)'}}>
-                  <div style={{height:80,overflow:'hidden',position:'relative',background:'#060810'}}>
-                    <img src={imgs[f]} alt={FASES[f]} style={{width:'100%',height:'100%',objectFit:'cover',filter:`brightness(${isAbate?'.2':'.3'}) saturate(.3)`,display:'block'}} onError={e=>e.target.style.display='none'}/>
-                    <div style={{position:'absolute',top:8,left:0,background:isAbate?'var(--red2)':'var(--rust)',color:isAbate?'var(--red)':'#fff',fontFamily:'var(--font-disp)',fontSize:9,letterSpacing:3,padding:'2px 10px'}}>SEM.{SEMANAS[f]}</div>
+                return <div key={f} style={{background:'var(--card)',border:`1px solid ${isAbate?'var(--rust2)':'var(--border)'}`,borderRadius:8,overflow:'hidden',transition:'all .2s ease',boxShadow:'0 4px 16px rgba(0,0,0,.4)'}} onMouseEnter={e=>{e.currentTarget.style.borderColor=isAbate?'var(--gold)':'var(--gold-dim)';e.currentTarget.style.boxShadow='0 8px 32px rgba(194,140,70,.2)'}} onMouseLeave={e=>{e.currentTarget.style.borderColor=isAbate?'var(--rust2)':'var(--border)';e.currentTarget.style.boxShadow='0 4px 16px rgba(0,0,0,.4)'}}>
+                  <div style={{height:90,overflow:'hidden',position:'relative',background:'#0a0706'}}>
+                    <img src={imgs[f]} alt={FASES[f]} style={{width:'100%',height:'100%',objectFit:'cover',filter:`brightness(${isAbate?'.45':'.55'}) saturate(.8)`,display:'block'}} onError={e=>e.target.style.display='none'}/>
+                    <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(21,15,12,.7) 0%,transparent 60%)'}}/>
+                    <div style={{position:'absolute',top:8,left:8,background:isAbate?'rgba(248,113,113,.15)':'rgba(194,140,70,.15)',color:isAbate?'var(--red)':'var(--gold)',fontFamily:'var(--font-data)',fontSize:9,fontWeight:700,letterSpacing:2,padding:'3px 8px',borderRadius:4,border:`1px solid ${isAbate?'var(--red)':'var(--gold-dim)'}`}}>S{SEMANAS[f]}</div>
                   </div>
-                  <div style={{padding:'10px 12px 14px'}}>
-                    <div style={{fontFamily:'var(--font-disp)',fontSize:20,letterSpacing:2,color:isAbate?'var(--rust)':'var(--ice)',lineHeight:1,marginBottom:2}}>{FASES[f].toUpperCase()}</div>
-                    <div style={{fontSize:10,color:'var(--ice3)',letterSpacing:2,marginBottom:10,fontWeight:300,textTransform:'uppercase'}}>{PESOS[f]}KG VIVO</div>
-                    <div style={{background:'var(--bg)',border:'1px solid var(--border)',padding:'8px 10px',boxShadow:'inset 0 2px 8px rgba(0,0,0,.6)',display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                  <div style={{padding:'12px 14px 16px'}}>
+                    <div style={{fontFamily:'var(--font-title)',fontSize:18,fontWeight:700,color:isAbate?'var(--gold)':'var(--ice)',lineHeight:1,marginBottom:2}}>{FASES[f]}</div>
+                    <div style={{fontSize:10,color:'var(--ice3)',letterSpacing:1,marginBottom:10,fontFamily:'var(--font-data)'}}>{PESOS[f]} kg vivo</div>
+                    <div style={{background:'var(--bg)',border:'1px solid var(--border)',padding:'8px 10px',borderRadius:4,boxShadow:'inset 0 2px 8px rgba(0,0,0,.6)',display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
                       <div>
-                        <div style={{fontSize:9,color:'var(--ice3)',letterSpacing:2,marginBottom:2}}>PRECO</div>
-                        <div style={{fontFamily:'var(--font-disp)',fontSize:22,letterSpacing:1,color:isAbate?'var(--rust)':'var(--grn)',lineHeight:1}}>${fmt(precoMap[f])}</div>
+                        <div style={{fontSize:9,color:'var(--ice3)',letterSpacing:1,marginBottom:2,fontFamily:'var(--font-data)'}}>PREÇO</div>
+                        <div style={{fontFamily:'var(--font-data)',fontSize:20,fontWeight:700,color:isAbate?'var(--gold)':'var(--grn)',lineHeight:1}}>${fmt(precoMap[f])}</div>
                       </div>
                       <div style={{textAlign:'right'}}>
-                        <div style={{fontSize:9,color:'var(--ice3)',letterSpacing:2,marginBottom:2}}>ORIGEM</div>
-                        <div style={{fontSize:10,color:'var(--ice2)',fontWeight:700,fontFamily:'var(--font-mono)',letterSpacing:1}}>{origemMap[f]}</div>
+                        <div style={{fontSize:9,color:'var(--ice3)',letterSpacing:1,marginBottom:2,fontFamily:'var(--font-data)'}}>ORIGEM</div>
+                        <div style={{fontSize:10,color:'var(--ice2)',fontWeight:600,fontFamily:'var(--font-data)',letterSpacing:0.5}}>{origemMap[f]}</div>
                       </div>
                     </div>
                   </div>
@@ -836,8 +840,8 @@ export default function App() {
 
             {/* Indicadores + Rebanho por fase */}
             <div style={gs(280)}>
-              <div style={{background:'var(--card)',border:'1px solid var(--border)',borderLeft:'3px solid var(--rust)',clipPath:'polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,0 100%)',padding:20}}>
-                <div style={{fontSize:10,letterSpacing:4,color:'var(--ice3)',textTransform:'uppercase',marginBottom:16,borderBottom:'1px solid var(--border)',paddingBottom:10,fontFamily:'var(--font-mono)'}}>// Indicadores agora</div>
+              <div style={{background:'var(--card)',border:'1px solid var(--border)',borderLeft:'3px solid var(--gold)',borderRadius:8,padding:20,boxShadow:'0 4px 20px rgba(0,0,0,.5)'}}>
+                <div style={{fontSize:10,letterSpacing:2,color:'var(--ice3)',textTransform:'uppercase',marginBottom:16,borderBottom:'1px solid var(--border)',paddingBottom:10,fontFamily:'var(--font-data)'}}>Indicadores agora</div>
                 <div style={gs(110)}>
                   <Metric T={T} label="Rebanho" value={`${mercado?.rebanho?.total||0}`} sub="cabecas ativas" color={mercado?.rebanho?.total>600?'var(--red)':mercado?.rebanho?.total>400?'var(--rust)':'var(--grn)'}/>
                   <Metric T={T} label="Margem est." value={`${mercado?.margem||'~30'}%`} sub="bezerro — abate" color="var(--grn)"/>
@@ -845,39 +849,39 @@ export default function App() {
                   <Metric T={T} label="Custo/cab" value={`$${fmt(mercado?.precos?.custoRacao)}`} sub="racao total" color="var(--ice2)"/>
                 </div>
                 <div style={{marginTop:16}}>
-                  <div style={{fontSize:9,color:'var(--ice3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'3px',fontFamily:'var(--font-mono)'}}>// Rebanho · entradas recentes</div>
+                  <div style={{fontSize:9,color:'var(--ice3)',marginBottom:6,textTransform:'uppercase',letterSpacing:2,fontFamily:'var(--font-data)'}}>Rebanho · entradas recentes</div>
                   <MiniChart data={rebanhoHist.length>1?rebanhoHist:[0,mercado?.rebanho?.total||0]} color="var(--rust)" T={T}/>
                 </div>
-                {mercado?.rebanho?.total>400&&<div style={{marginTop:12,background:mercado.rebanho.total>600?'var(--red2)':'var(--rust3)',border:`1px solid ${mercado.rebanho.total>600?'var(--red)':'var(--rust2)'}`,padding:'6px 10px',fontSize:10,color:mercado.rebanho.total>600?'var(--red)':'var(--rust)',letterSpacing:1,fontWeight:700,fontFamily:'var(--font-mono)'}}>{mercado.rebanho.total>600?'RACAO CARA — MARGEM CRITICA':'DEMANDA ELEVADA — RACAO EM ALTA'}</div>}
+                {mercado?.rebanho?.total>400&&<div style={{marginTop:12,background:mercado.rebanho.total>600?'var(--red2)':'var(--rust3)',border:`1px solid ${mercado.rebanho.total>600?'var(--red)':'var(--rust2)'}`,padding:'8px 12px',fontSize:11,color:mercado.rebanho.total>600?'var(--red)':'var(--gold)',borderRadius:4,letterSpacing:0.5,fontWeight:600,fontFamily:'var(--font-data)'}}>{mercado.rebanho.total>600?'⚠ Ração cara — Margem crítica':'↑ Demanda elevada — Ração em alta'}</div>}
               </div>
 
-              <div style={{background:'var(--card)',border:'1px solid var(--border)',padding:20}}>
-                <div style={{fontSize:10,letterSpacing:4,color:'var(--ice3)',textTransform:'uppercase',marginBottom:16,borderBottom:'1px solid var(--border)',paddingBottom:10,fontFamily:'var(--font-mono)'}}>// Rebanho por fase</div>
+              <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,padding:20,boxShadow:'0 4px 20px rgba(0,0,0,.5)'}}>
+                <div style={{fontSize:10,letterSpacing:2,color:'var(--ice3)',textTransform:'uppercase',marginBottom:16,borderBottom:'1px solid var(--border)',paddingBottom:10,fontFamily:'var(--font-data)'}}>Rebanho por fase</div>
                 {['bezerro','garrote','boi'].map((f,idx)=>{
                   const qty=mercado?.rebanho?.[f]||0
                   const pct=Math.min((qty/400)*100,100)
                   const barColor=['var(--grn)','var(--rust)','var(--ice2)'][idx]
                   return <div key={f} style={{marginBottom:14}}>
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:6,fontSize:11}}>
-                      <span style={{color:'var(--ice2)',letterSpacing:2,textTransform:'uppercase',fontFamily:'var(--font-mono)',fontWeight:400}}>{FASES[f]}</span>
-                      <span style={{color:'var(--ice)',fontWeight:700,fontFamily:'var(--font-disp)',fontSize:14,letterSpacing:1}}>{qty} CAB.</span>
+                      <span style={{color:'var(--ice2)',letterSpacing:1,textTransform:'uppercase',fontFamily:'var(--font-data)',fontWeight:500}}>{FASES[f]}</span>
+                      <span style={{color:'var(--ice)',fontWeight:700,fontFamily:'var(--font-data)',fontSize:14,letterSpacing:0.5}}>{qty} cab.</span>
                     </div>
-                    <div style={{background:'var(--input-bg)',height:4,borderRadius:0}}>
+                    <div style={{background:'var(--input-bg)',height:5,borderRadius:4}}>
                       <div style={{width:`${pct}%`,height:'100%',background:barColor,transformOrigin:'left',animation:'barGrow .8s cubic-bezier(.4,0,.2,1) both'}}/>
                     </div>
                   </div>
                 })}
                 <div style={{marginTop:8,paddingTop:12,borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontSize:10,color:'var(--ice3)',letterSpacing:1,fontFamily:'var(--font-mono)'}}>Limite racao normal: 400 cab.</span>
+                  <span style={{fontSize:10,color:'var(--ice3)',letterSpacing:0.5,fontFamily:'var(--font-data)'}}>Limite ração normal: 400 cab.</span>
                   <Badge type={mercado?.rebanho?.total>600?'danger':mercado?.rebanho?.total>400?'warn':'ok'}>{mercado?.rebanho?.total>600?'RACAO CARA':mercado?.rebanho?.total>400?'ELEVADA':'NORMAL'}</Badge>
                 </div>
                 <div style={{marginTop:20}}>
-                  <div style={{fontSize:9,letterSpacing:3,color:'var(--ice3)',textTransform:'uppercase',marginBottom:10,fontFamily:'var(--font-mono)'}}>// Cotacoes</div>
-                  {[{sym:'BZR',label:'Bezerro · S1',preco:mercado?.precos?.bezerro,chg:null,kill:false},{sym:'GRR',label:'Garrote · S2',preco:mercado?.precos?.garrote,chg:mercado?.precos?.garrote?`+${((mercado.precos.garrote/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:null,kill:false},{sym:'BOI',label:'Boi · S3',preco:mercado?.precos?.boi,chg:mercado?.precos?.boi?`+${((mercado.precos.boi/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:null,kill:false},{sym:'FGR',label:'Frigorifico · S4',preco:mercado?.precos?.abate,chg:mercado?.precos?.abate?`+${((mercado.precos.abate/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:null,kill:true}].map(row=>(
-                    <div key={row.sym} style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:12,alignItems:'center',padding:'8px 0',borderBottom:'1px solid rgba(58,64,72,.4)'}}>
-                      <div style={{fontSize:11,fontWeight:700,color:'var(--ice)',letterSpacing:2,fontFamily:'var(--font-mono)'}}>{row.sym} / {row.label}</div>
-                      <div style={{fontFamily:'var(--font-disp)',fontSize:18,letterSpacing:1,color:row.kill?'var(--rust)':'var(--grn)'}}>${fmt(row.preco)}</div>
-                      <div style={{fontSize:11,fontWeight:700,minWidth:54,textAlign:'right',color:row.chg?'var(--grn)':'var(--ice3)',fontFamily:'var(--font-mono)'}}>{row.chg||'FIXO'}</div>
+                  <div style={{fontSize:9,letterSpacing:2,color:'var(--ice3)',textTransform:'uppercase',marginBottom:10,fontFamily:'var(--font-data)'}}>Cotações</div>
+                  {[{sym:'BZR',label:'Bezerro · S1',preco:mercado?.precos?.bezerro,chg:null,kill:false},{sym:'GRR',label:'Garrote · S2',preco:mercado?.precos?.garrote,chg:mercado?.precos?.garrote?`+${((mercado.precos.garrote/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:null,kill:false},{sym:'BOI',label:'Boi · S3',preco:mercado?.precos?.boi,chg:mercado?.precos?.boi?`+${((mercado.precos.boi/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:null,kill:false},{sym:'FGR',label:'Frigorífico · S4',preco:mercado?.precos?.abate,chg:mercado?.precos?.abate?`+${((mercado.precos.abate/(mercado.precos.bezerro||800)-1)*100).toFixed(1)}%`:null,kill:true}].map(row=>(
+                    <div key={row.sym} style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:12,alignItems:'center',padding:'8px 0',borderBottom:`1px solid var(--border)`}}>
+                      <div style={{fontSize:11,fontWeight:500,color:'var(--ice)',letterSpacing:0.5,fontFamily:'var(--font-data)'}}>{row.sym} · {row.label}</div>
+                      <div style={{fontFamily:'var(--font-data)',fontSize:17,fontWeight:700,color:row.kill?'var(--gold)':'var(--grn)'}}>${fmt(row.preco)}</div>
+                      <div style={{fontSize:11,fontWeight:600,minWidth:50,textAlign:'right',color:row.chg?'var(--grn)':'var(--ice3)',fontFamily:'var(--font-data)'}}>{row.chg||'FIXO'}</div>
                     </div>
                   ))}
                 </div>
