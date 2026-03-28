@@ -533,7 +533,7 @@ function ContadorRacao({ racao, minhasLotes, T }) {
       </div>
       <div style={{ textAlign:'right', flexShrink:0 }}>
         <div style={{ fontSize:10, color:T.textMuted, marginBottom:6, fontFamily:"'DM Mono',monospace", textTransform:'uppercase', letterSpacing:1 }}>Acaba em</div>
-        <div style={{ fontSize:18, fontWeight:700, color, fontFamily:"'Playfair Display',serif" }}>{dataFim}</div>
+        <div style={{ fontSize:18, fontWeight:700, color:cor, fontFamily:"'Playfair Display',serif" }}>{dataFim}</div>
         <div style={{ marginTop:10, height:4, width:80, background:T.border, borderRadius:4, overflow:'hidden' }}>
           <div style={{ height:'100%', borderRadius:4, background:cor, width:`${Math.min(100, (diasLeft/30)*100)}%`, transition:'width .5s' }}/>
         </div>
@@ -629,7 +629,7 @@ function AgendaRebanho({ lotes, T }) {
 // ─── Minha Fazenda Page ───────────────────────────────────────────────────────
 export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado, racao }) {
   const [fazendas, setFazendas] = useState([])
-  const [selectedFaz, setSelectedFaz] = useState(null)
+  const [selectedFaz, setSelectedFaz] = useState(null) // usada só para Serviços
   const [fretes, setFretes] = useState([])
   const [custos, setCustos] = useState([])
   const [novoCusto, setNovoCusto] = useState({ tipo:'cerca', descricao:'', valor:'', prestador_nome:'' })
@@ -646,7 +646,11 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado, racao }
     const f = fRes || []
     setFazendas(f)
     setFretes(frRes || [])
-    if (f.length && !selectedFaz) setSelectedFaz(f[0])
+    // Seleciona a primeira fazenda real (não pasto fake) para o painel de Serviços
+    if (!selectedFaz) {
+      const real = f.find(fz => !String(fz.id).startsWith('pasto_')) || f[0]
+      if (real) setSelectedFaz(real)
+    }
     setLoading(false)
   }, [user, selectedFaz])
 
@@ -657,13 +661,34 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado, racao }
     api(`/api/custos?fazenda_id=${selectedFaz.id}`).then(setCustos)
   }, [selectedFaz, api])
 
-  // Match lotes by fazenda_id OR by jogador ownership (for lotes without fazenda_id)
-  const minhasLotes = (lotes||[]).filter(l => 
-    String(l.fazenda_id) === String(selectedFaz?.id) ||
-    (l.fazenda_id === null && String(l.jogador_id) === String(user?.id))
+  // ── TODOS os lotes ativos do jogador (independente de qual fazenda) ──
+  const minhasLotes = (lotes||[]).filter(l => l.status === 'ativo')
+
+  // Mapa: fazenda_id real → objeto fazenda (exclui pasto_ fakes pois têm IDs fake)
+  const fazMap = new Map(
+    fazendas
+      .filter(f => !String(f.id).startsWith('pasto_'))
+      .map(f => [String(f.id), f])
   )
-  const cap = selectedFaz ? calcCapacidade(minhasLotes, Number(selectedFaz.tamanho_ha)) : null
-  const vaqueirosNec = Math.floor(minhasLotes.reduce((s,l)=>s+l.quantidade,0) / 60)
+
+  // Agrupa lotes por fazenda_id → [{fazenda, lotes, cap}]
+  const gruposMap = {}
+  minhasLotes.forEach(l => {
+    const key = String(l.fazenda_id ?? 'sem_fazenda')
+    if (!gruposMap[key]) gruposMap[key] = []
+    gruposMap[key].push(l)
+  })
+  const grupos = Object.entries(gruposMap).map(([fazId, gLotes]) => {
+    const fazenda = fazMap.get(fazId) || null
+    const gcap = fazenda ? calcCapacidade(gLotes, Number(fazenda.tamanho_ha)) : null
+    return { fazId, fazenda, lotes: gLotes, cap: gcap }
+  }).sort((a, b) => (a.fazenda ? 0 : 1) - (b.fazenda ? 0 : 1))
+
+  // Verifica se alguma fazenda está superlotada (para AlertasPanel e AluguelPastoNPC)
+  const algumaSuplertolada = grupos.find(g => g.cap?.lotada) || null
+
+  // Somente fazendas reais (sem pasto_ fake) para o seletor de Serviços
+  const realFazendas = fazendas.filter(f => !String(f.id).startsWith('pasto_'))
   const custosPend = custos.filter(c => c.status === 'pendente').length
 
   async function abrirChamado() {
@@ -704,12 +729,13 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado, racao }
 
   return (
     <div>
+      {/* Header */}
       <div style={{ marginBottom:28, paddingBottom:16, borderBottom:`1px solid ${T.border}` }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
           <span style={{ fontSize:24 }}>🌾</span>
           <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Minha Fazenda</h1>
         </div>
-        <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Gestão da sua propriedade rural</p>
+        <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Gestão da sua propriedade rural · {minhasLotes.reduce((s,l)=>s+l.quantidade,0)} cabeças no total</p>
       </div>
 
       {/* Frete em andamento */}
@@ -721,179 +747,216 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado, racao }
         }}/>
       ))}
 
-      {/* ── Contador de Ração ── */}
+      {/* Contador de Ração — todos os lotes */}
       <ContadorRacao racao={racao} minhasLotes={minhasLotes} T={T}/>
 
-      {/* Selector se tem mais de 1 fazenda */}
-      {fazendas.length > 1 && (
-        <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
-          {fazendas.map(f => (
-            <button key={f.id} onClick={() => setSelectedFaz(f)} style={{ padding:'7px 14px', borderRadius:10, border:`1px solid ${selectedFaz?.id===f.id?'#5030c0':T.border}`, background:selectedFaz?.id===f.id?'rgba(80,48,192,.2)':'transparent', color:selectedFaz?.id===f.id?'#a080ff':T.textMuted, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:selectedFaz?.id===f.id?600:400 }}>
-              {f.codigo} — {f.nome}
-            </button>
-          ))}
-        </div>
+      {/* Alertas automáticos — todos os lotes */}
+      <AlertasPanel
+        minhasLotes={minhasLotes}
+        racao={racao}
+        cap={algumaSuplertolada?.cap || null}
+        custos={custos}
+        T={T}
+      />
+
+      {/* ═══ REBANHO POR FAZENDA/LOCALIZAÇÃO ═══ */}
+      {grupos.map(grupo => {
+        const { fazId, fazenda, lotes: gLotes, cap: gCap } = grupo
+        const totalCab  = gLotes.reduce((s,l) => s + l.quantidade, 0)
+        const consTotal = gLotes.reduce((s,l) => s + ({bezerro:3,garrote:5,boi:8,abatido:0}[l.fase]||0)*l.quantidade, 0)
+        const valorEst  = gLotes.reduce((s,l) => s + l.quantidade*(mercado?.precos?.abate||0), 0)
+        const nomeFaz   = fazenda?.nome || (fazId === 'sem_fazenda' ? 'Sem fazenda associada' : `Local #${fazId}`)
+        const isPasto   = !fazenda
+
+        return (
+          <div key={fazId} style={{ marginBottom:16 }}>
+            {/* Foto hero (só para fazendas reconhecidas com foto) */}
+            {fazenda?.foto_url && (
+              <div style={{ height:160, borderRadius:'12px 12px 0 0', overflow:'hidden', position:'relative' }}>
+                <img src={fazenda.foto_url} alt={nomeFaz} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.6)' }} onError={e=>e.target.style.display='none'}/>
+                <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.85) 0%,transparent 55%)' }}/>
+                <div style={{ position:'absolute', bottom:16, left:20 }}>
+                  <div style={{ fontSize:18, fontWeight:800, color:'#fff', fontFamily:"'Playfair Display',serif" }}>{nomeFaz}</div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,.7)' }}>{fazenda.codigo} · {fazenda.regiao} · {fazenda.tamanho_ha} ha</div>
+                </div>
+                {gCap?.lotada && (
+                  <div style={{ position:'absolute', top:14, right:14, background:'rgba(200,50,50,.9)', color:'#fff', borderRadius:20, padding:'4px 12px', fontSize:12, fontWeight:700 }}>
+                    ⚠ Superlotada
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{
+              background: T.card, border:`1px solid ${gCap?.lotada ? '#6a1818' : T.border}`,
+              borderRadius: fazenda?.foto_url ? '0 0 12px 12px' : 12,
+              padding:16,
+            }}>
+              {/* Cabeçalho de texto (quando não tem foto hero) */}
+              {!fazenda?.foto_url && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, paddingBottom:12, borderBottom:`1px solid ${T.border}` }}>
+                  <span style={{ fontSize:22 }}>{isPasto ? '🌿' : '🏡'}</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:15, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>{nomeFaz}</div>
+                    <div style={{ fontSize:11, color:T.textMuted }}>
+                      {fazenda ? `${fazenda.codigo} · ${fazenda.regiao} · ${fazenda.tamanho_ha} ha` : 'Gado vinculado a este local'}
+                    </div>
+                  </div>
+                  {gCap?.lotada && (
+                    <span style={{ background:'rgba(200,50,50,.2)', border:'1px solid #6a1818', color:'#f87171', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:700 }}>⚠ Superlotada</span>
+                  )}
+                </div>
+              )}
+
+              {/* Resumo: cabeças / ração / valor */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom: gCap ? 12 : 0 }}>
+                {[
+                  { label:'Cabeças',    value: totalCab,           color: T.text },
+                  { label:'Ração/dia',  value: `${consTotal}kg`,   color: T.textDim },
+                  { label:'Valor Est.', value: `$${fmt(valorEst)}`, color: T.gold },
+                ].map(m => (
+                  <div key={m.label} style={{ background:T.inputBg, borderRadius:8, padding:'10px 12px', border:`1px solid ${T.border}`, textAlign:'center' }}>
+                    <div style={{ fontSize:10, color:T.textMuted, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>{m.label}</div>
+                    <div style={{ fontSize:15, fontWeight:700, color:m.color, fontFamily:"'DM Mono',monospace" }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Barra de capacidade */}
+              {gCap && (
+                <div style={{ marginBottom:12 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:T.textMuted, marginBottom:4 }}>
+                    <span>Capacidade</span>
+                    <span style={{ fontWeight:600, color: gCap.lotada ? '#f87171' : T.gold }}>{gCap.usada} / {gCap.total} ha equiv.</span>
+                  </div>
+                  <div style={{ background:T.border, borderRadius:4, height:7, overflow:'hidden' }}>
+                    <div style={{ width:`${gCap.pct}%`, height:'100%', borderRadius:4, background: gCap.lotada ? 'linear-gradient(90deg,#c84040,#f87171)' : 'linear-gradient(90deg,#4060d0,#8040c0)', transition:'width .6s' }}/>
+                  </div>
+                  {gCap.lotada && (
+                    <div style={{ marginTop:8, fontSize:11, color:'#f87171', lineHeight:1.5 }}>
+                      ⚠ Superlotada — venda animais ou alugue um pasto extra.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Lista de lotes */}
+              {gLotes.length > 0 && (
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {gLotes.map(l => {
+                    const cons = ({bezerro:3,garrote:5,boi:8,abatido:0}[l.fase]||0)*l.quantidade
+                    const valorAbate = (mercado?.precos?.abate||0)*l.quantidade
+                    return (
+                      <div key={l.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 12px', background:T.inputBg, borderRadius:8, border:`1px solid ${T.border}`, flexWrap:'wrap' }}>
+                        <div style={{ flex:1 }}>
+                          <span style={{ fontWeight:700, color:T.text, fontSize:13, fontFamily:"'DM Mono',monospace" }}>{l.codigo}</span>
+                          <span style={{ color:T.textMuted, fontSize:12, marginLeft:8 }}>{l.quantidade} cab. · {l.fase}</span>
+                        </div>
+                        {cons > 0 && <div style={{ fontSize:12, color:T.textMuted }}>{cons}kg/dia</div>}
+                        <div style={{ fontWeight:600, color:T.gold, fontFamily:"'DM Mono',monospace" }}>${fmt(valorAbate)}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Agenda do Rebanho — todos os lotes */}
+      <AgendaRebanho lotes={minhasLotes} T={T}/>
+
+      {/* Aluguel de pasto NPC — só se alguma fazenda estiver superlotada */}
+      {algumaSuplertolada && (
+        <AluguelPastoNPC T={T} user={user} api={api} notify={notify} fazenda={algumaSuplertolada.fazenda || selectedFaz}/>
       )}
 
-      {selectedFaz && (
-        <>
-          {/* Foto hero da fazenda */}
-          <div style={{ height:200, borderRadius:16, overflow:'hidden', marginBottom:20, position:'relative' }}>
-            <img src={selectedFaz.foto_url} alt={selectedFaz.nome} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.7)' }} onError={e=>e.target.style.display='none'}/>
-            <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.8) 0%,transparent 50%)' }}/>
-            <div style={{ position:'absolute', bottom:20, left:24 }}>
-              <div style={{ fontSize:22, fontWeight:800, color:'#fff', fontFamily:"'Playfair Display',serif" }}>{selectedFaz.nome}</div>
-              <div style={{ fontSize:13, color:'rgba(255,255,255,.7)' }}>Código {selectedFaz.codigo} · {selectedFaz.regiao} · {selectedFaz.tamanho_ha} ha</div>
+      {/* ── Serviços / Custos ── */}
+      {realFazendas.length > 0 && (
+        <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:18, marginBottom:16 }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:T.text, marginBottom:6 }}>Serviços da fazenda</div>
+          <p style={{ fontSize:12, color:T.textMuted, marginBottom:16 }}>Abra chamados para serviços que precisam ser realizados. Selecione quem vai fazer, acerte os detalhes e marque como pago após o RP.</p>
+
+          {/* Seletor de fazenda (só fazendas reais) */}
+          {realFazendas.length > 1 && (
+            <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+              {realFazendas.map(f => (
+                <button key={f.id} onClick={() => setSelectedFaz(f)} style={{ padding:'6px 12px', borderRadius:8, border:`1px solid ${selectedFaz?.id===f.id?'#5030c0':T.border}`, background:selectedFaz?.id===f.id?'rgba(80,48,192,.2)':'transparent', color:selectedFaz?.id===f.id?'#a080ff':T.textMuted, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:selectedFaz?.id===f.id?600:400 }}>
+                  {f.codigo} — {f.nome}
+                </button>
+              ))}
             </div>
-            {custosPend > 0 && (
-              <div style={{ position:'absolute', top:16, right:16, background:'rgba(200,50,50,.9)', color:'#fff', borderRadius:20, padding:'4px 12px', fontSize:12, fontWeight:700 }}>
-                ⚠ {custosPend} serviço(s) pendente(s)
+          )}
+
+          {custosPend > 0 && (
+            <div style={{ marginBottom:12, padding:'8px 14px', background:'rgba(200,50,50,.1)', border:'1px solid #6a1818', borderRadius:8, fontSize:12, color:'#f87171' }}>
+              ⚠ {custosPend} serviço(s) pendente(s) em {selectedFaz?.nome}
+            </div>
+          )}
+
+          {/* Novo chamado */}
+          <div style={{ background:T.inputBg, borderRadius:12, padding:16, marginBottom:16, border:`1px solid ${T.border}` }}>
+            <div style={{ fontSize:12, fontWeight:600, color:T.textMuted, textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>
+              Novo chamado · {selectedFaz?.nome}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:10, marginBottom:12 }}>
+              <div>
+                <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'.6px' }}>Tipo</label>
+                <select value={novoCusto.tipo} onChange={e=>setNovoCusto(c=>({...c,tipo:e.target.value}))} style={{ width:'100%', background:T.card, border:`1px solid ${T.border2||T.border}`, borderRadius:8, padding:'9px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}>
+                  {TIPOS_CUSTO.map(t => <option key={t.tipo} value={t.tipo}>{t.emoji} {t.label}</option>)}
+                </select>
               </div>
-            )}
+              <div>
+                <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'.6px' }}>Quem vai fazer</label>
+                <input value={novoCusto.prestador_nome} onChange={e=>setNovoCusto(c=>({...c,prestador_nome:e.target.value}))} placeholder="NomeJogador" style={{ width:'100%', background:T.card, border:`1px solid ${T.border2||T.border}`, borderRadius:8, padding:'9px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
+              </div>
+              <div>
+                <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'.6px' }}>Valor combinado ($)</label>
+                <input type="number" value={novoCusto.valor} onChange={e=>setNovoCusto(c=>({...c,valor:e.target.value}))} placeholder="500" style={{ width:'100%', background:T.card, border:`1px solid ${T.border2||T.border}`, borderRadius:8, padding:'9px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
+              </div>
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'.6px' }}>Descrição</label>
+              <input value={novoCusto.descricao} onChange={e=>setNovoCusto(c=>({...c,descricao:e.target.value}))} placeholder="Ex: Reforma da cerca do pasto norte..." style={{ width:'100%', background:T.card, border:`1px solid ${T.border2||T.border}`, borderRadius:8, padding:'9px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
+            </div>
+            <button onClick={abrirChamado} style={{ padding:'9px 18px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+              Abrir chamado
+            </button>
           </div>
 
-          {/* ── Alertas automáticos ── */}
-          <AlertasPanel minhasLotes={minhasLotes} racao={racao} cap={cap} custos={custos} T={T}/>
-
-          {/* Capacidade */}
-          {cap && (
-            <div style={{ background: cap.lotada ? 'rgba(42,10,10,.8)' : T.card, border:`1px solid ${cap.lotada?'#6a1818':T.border}`, borderRadius:14, padding:18, marginBottom:16 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>Capacidade da fazenda</div>
-                <span style={{ background: cap.lotada?'rgba(42,10,10,.9)':'rgba(10,42,26,.9)', border:`1px solid ${cap.lotada?'#6a1818':'#1a6a4a'}`, color:cap.lotada?'#e06060':'#4ad4a0', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
-                  {cap.lotada ? '⚠ Superlotada' : '✓ Normal'}
-                </span>
-              </div>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:T.textMuted, marginBottom:8 }}>
-                <span>Capacidade usada</span>
-                <span style={{ fontWeight:600, color: cap.lotada?'#e06060':T.gold }}>{cap.usada} / {cap.total} ha equiv.</span>
-              </div>
-              <div style={{ background:T.border, borderRadius:6, height:10, overflow:'hidden', marginBottom:12 }}>
-                <div style={{ width:`${cap.pct}%`, height:'100%', background: cap.lotada?'linear-gradient(90deg,#c84040,#e06060)':'linear-gradient(90deg,#4060d0,#8040c0)', borderRadius:6, transition:'width .6s ease' }}/>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
-                {[['bezerro','🐄 Bezerros','info'],['garrote','🐄 Garrotes','warn'],['boi','🐄 Bois adultos','gold']].map(([f,l,c]) => {
-                  const maxCap = Number(selectedFaz.tamanho_ha) * CAP_POR_HA[f]
-                  const atual = minhasLotes.filter(lot=>lot.fase===f).reduce((s,lot)=>s+lot.quantidade,0)
-                  return (
-                    <div key={f} style={{ background:T.inputBg, borderRadius:10, padding:'10px 12px', border:`1px solid ${T.border}`, textAlign:'center' }}>
-                      <div style={{ fontSize:11, color:T.textMuted, marginBottom:4 }}>{l}</div>
-                      <div style={{ fontSize:16, fontWeight:700, color:atual>maxCap?'#e06060':T.text }}>{atual}</div>
-                      <div style={{ fontSize:10, color:T.textMuted }}>máx {maxCap}</div>
+          {/* Lista de chamados */}
+          {custos.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'20px 0', color:T.textMuted, fontSize:13 }}>Nenhum chamado aberto</div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {custos.map(c => {
+                const tipo = TIPOS_CUSTO.find(t => t.tipo === c.tipo)
+                return (
+                  <div key={c.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:T.inputBg, borderRadius:10, border:`1px solid ${c.status==='pago'?T.border:'#3020a0'}`, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:20 }}>{tipo?.emoji || '🔧'}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{tipo?.label || c.tipo}</div>
+                      {c.descricao && <div style={{ fontSize:11, color:T.textMuted }}>{c.descricao}</div>}
+                      {c.prestador_nome && <div style={{ fontSize:11, color:'#a080ff' }}>👤 {c.prestador_nome}</div>}
                     </div>
-                  )
-                })}
-              </div>
-              {cap.lotada && (
-                <div style={{ marginTop:12, padding:'10px 14px', background:'rgba(200,64,64,.1)', borderRadius:10, border:'1px solid #6a1818', fontSize:12, color:'#e06060', lineHeight:1.6 }}>
-                  ⚠ Sua fazenda está superlotada! À medida que o gado avança de fase, você precisará vender animais. Garrote suporta 2/ha e boi adulto apenas 1/ha.
-                </div>
-              )}
-              {vaqueirosNec > 0 && (
-                <div style={{ marginTop:10, padding:'10px 14px', background:'rgba(80,48,192,.1)', borderRadius:10, border:'1px solid #3020a0', fontSize:12, color:'#a080ff', lineHeight:1.6 }}>
-                  👨‍🌾 Seu rebanho exige <strong>{vaqueirosNec} vaqueiro(s)</strong> contratado(s). Abra um chamado de serviço abaixo.
-                </div>
-              )}
+                    <div style={{ textAlign:'right' }}>
+                      <div style={{ fontWeight:700, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(c.valor)}</div>
+                      <div style={{ fontSize:10, color:T.textMuted }}>{new Date(c.criado_em).toLocaleDateString('pt-BR')}</div>
+                    </div>
+                    {c.status === 'pendente' ? (
+                      <button onClick={() => marcarPago(c.id)} style={{ padding:'6px 12px', background:'rgba(80,48,192,.2)', border:'1px solid #3020a0', color:'#a080ff', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
+                        ✓ Marcar pago
+                      </button>
+                    ) : (
+                      <span style={{ background:'rgba(10,42,26,.8)', border:'1px solid #1a6a4a', color:'#4ad4a0', fontSize:10, padding:'4px 10px', borderRadius:10, fontWeight:600 }}>✓ Pago</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
-
-          {/* Lotes na fazenda */}
-          {minhasLotes.length > 0 && (
-            <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:18, marginBottom:16 }}>
-              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:T.text, marginBottom:14 }}>Rebanho nesta fazenda</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {minhasLotes.map(l => {
-                  const cons = ({bezerro:3,garrote:5,boi:8,abatido:0}[l.fase]||0)*l.quantidade
-                  const valorAbate = ((mercado?.precos?.abate||0)*l.quantidade)
-                  return (
-                    <div key={l.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:T.inputBg, borderRadius:10, border:`1px solid ${T.border}`, flexWrap:'wrap' }}>
-                      <div style={{ flex:1 }}>
-                        <span style={{ fontWeight:700, color:T.text, fontSize:13 }}>{l.codigo}</span>
-                        <span style={{ color:T.textMuted, fontSize:12, marginLeft:8 }}>{l.quantidade} cab. · {l.fase}</span>
-                      </div>
-                      <div style={{ fontSize:12, color:T.textMuted }}>{cons > 0 ? `${cons}kg ração/dia` : ''}</div>
-                      <div style={{ fontWeight:600, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(valorAbate)}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ── Agenda do Rebanho ── */}
-          <AgendaRebanho lotes={minhasLotes} T={T}/>
-
-          {/* Aluguel de pasto NPC */}
-          {cap?.lotada && (
-            <AluguelPastoNPC T={T} user={user} api={api} notify={notify} fazenda={selectedFaz}/>
-          )}
-
-          {/* Serviços/Custos */}
-          <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:14, padding:18, marginBottom:16 }}>
-            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:T.text, marginBottom:6 }}>Serviços da fazenda</div>
-            <p style={{ fontSize:12, color:T.textMuted, marginBottom:16 }}>Abra chamados para serviços que precisam ser realizados. Selecione quem vai fazer, acerte os detalhes e marque como pago após o RP.</p>
-
-            {/* Novo chamado */}
-            <div style={{ background:T.inputBg, borderRadius:12, padding:16, marginBottom:16, border:`1px solid ${T.border}` }}>
-              <div style={{ fontSize:12, fontWeight:600, color:T.textMuted, textTransform:'uppercase', letterSpacing:'.6px', marginBottom:12 }}>Novo chamado de serviço</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:10, marginBottom:12 }}>
-                <div>
-                  <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'.6px' }}>Tipo</label>
-                  <select value={novoCusto.tipo} onChange={e=>setNovoCusto(c=>({...c,tipo:e.target.value}))} style={{ width:'100%', background:T.card, border:`1px solid ${T.border2||T.border}`, borderRadius:8, padding:'9px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}>
-                    {TIPOS_CUSTO.map(t => <option key={t.tipo} value={t.tipo}>{t.emoji} {t.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'.6px' }}>Quem vai fazer</label>
-                  <input value={novoCusto.prestador_nome} onChange={e=>setNovoCusto(c=>({...c,prestador_nome:e.target.value}))} placeholder="NomeJogador" style={{ width:'100%', background:T.card, border:`1px solid ${T.border2||T.border}`, borderRadius:8, padding:'9px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
-                </div>
-                <div>
-                  <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'.6px' }}>Valor combinado ($)</label>
-                  <input type="number" value={novoCusto.valor} onChange={e=>setNovoCusto(c=>({...c,valor:e.target.value}))} placeholder="500" style={{ width:'100%', background:T.card, border:`1px solid ${T.border2||T.border}`, borderRadius:8, padding:'9px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
-                </div>
-              </div>
-              <div style={{ marginBottom:12 }}>
-                <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'.6px' }}>Descrição</label>
-                <input value={novoCusto.descricao} onChange={e=>setNovoCusto(c=>({...c,descricao:e.target.value}))} placeholder="Ex: Reforma da cerca do pasto norte..." style={{ width:'100%', background:T.card, border:`1px solid ${T.border2||T.border}`, borderRadius:8, padding:'9px 10px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
-              </div>
-              <button onClick={abrirChamado} style={{ padding:'9px 18px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-                Abrir chamado
-              </button>
-            </div>
-
-            {/* Lista de chamados */}
-            {custos.length === 0 ? (
-              <div style={{ textAlign:'center', padding:'20px 0', color:T.textMuted, fontSize:13 }}>Nenhum chamado aberto</div>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {custos.map(c => {
-                  const tipo = TIPOS_CUSTO.find(t => t.tipo === c.tipo)
-                  return (
-                    <div key={c.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:T.inputBg, borderRadius:10, border:`1px solid ${c.status==='pago'?T.border:'#3020a0'}`, flexWrap:'wrap' }}>
-                      <span style={{ fontSize:20 }}>{tipo?.emoji || '🔧'}</span>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{tipo?.label || c.tipo}</div>
-                        {c.descricao && <div style={{ fontSize:11, color:T.textMuted }}>{c.descricao}</div>}
-                        {c.prestador_nome && <div style={{ fontSize:11, color:'#a080ff' }}>👤 {c.prestador_nome}</div>}
-                      </div>
-                      <div style={{ textAlign:'right' }}>
-                        <div style={{ fontWeight:700, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(c.valor)}</div>
-                        <div style={{ fontSize:10, color:T.textMuted }}>{new Date(c.criado_em).toLocaleDateString('pt-BR')}</div>
-                      </div>
-                      {c.status === 'pendente' ? (
-                        <button onClick={() => marcarPago(c.id)} style={{ padding:'6px 12px', background:'rgba(80,48,192,.2)', border:'1px solid #3020a0', color:'#a080ff', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
-                          ✓ Marcar pago
-                        </button>
-                      ) : (
-                        <span style={{ background:'rgba(10,42,26,.8)', border:'1px solid #1a6a4a', color:'#4ad4a0', fontSize:10, padding:'4px 10px', borderRadius:10, fontWeight:600 }}>✓ Pago</span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </>
+        </div>
       )}
     </div>
   )
