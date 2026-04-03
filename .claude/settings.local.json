@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -rh \"FROM \\\\|INTO \\\\|UPDATE \" /d/DOCUMENTOS/GitHub/gvrpnl-pecuaria/pages/api --include=*.js)"
+      "Bash(grep -rh \"FROM \\\\|INTO \\\\|UPDATE \" /d/DOCUMENTOS/GitHub/gvrpnl-pecuaria/pages/api --include=*.js)",
+      "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" status)",
+      "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" status --short pages/)",
+      "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" log --oneline -3)",
+      "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" show --name-only HEAD)"
     ]
   }
 }
