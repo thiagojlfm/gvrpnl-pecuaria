@@ -91,26 +91,31 @@ function makeCampo(id, cultura, ha, status, opts = {}) {
   return { id, cultura, area_ha:ha, marca_maquina:'Valtra', status, custo_total:ha*CULTURAS[cultura].custo, resultado:null, clima:null, ...opts }
 }
 const MOCK_GARAGEM = [
-  { id:1, tipo:'trator',        marca:'Valtra', nome:'Valtra A110'  },
-  { id:2, tipo:'plantadeira',   marca:'Valtra', nome:'Valtra SP-20' },
-  { id:3, tipo:'colheitadeira', marca:'Valtra', nome:'Valtra CH-50' },
+  { id:1, tipo:'trator',        marca:'John Deere', nome:'John Deere 6M'   },
+  { id:2, tipo:'plantadeira',   marca:'John Deere', nome:'John Deere DB60' },
+  { id:3, tipo:'colheitadeira', marca:'Fendt',      nome:'Fendt IDEAL 9T'  },
+  { id:4, tipo:'trator',        marca:'Valtra',     nome:'Valtra A110'     },
 ]
 const MOCK_CAMPOS = [
   makeCampo(1,'milho',20,'arando',{
+    marca_maquina: 'John Deere',
     inicio_op: new Date(_n - 4*_h).toISOString(),
-    fim_op:    new Date(_n + 12*_h).toISOString(), // 16h total, 4h feitos
+    fim_op:    new Date(_n + 3*_h).toISOString(), // 70 ha/dia → ~7h p/ 20ha
   }),
   makeCampo(2,'soja',10,'crescendo',{
+    marca_maquina: 'Fendt',
     inicio_op: new Date(_n - 3*_d).toISOString(),
     fim_op:    new Date(_n + 4*_d).toISOString(),
     clima: 'ideal',
   }),
-  makeCampo(3,'milho',15,'pronto',{ clima:'granizo' }),
+  makeCampo(3,'milho',15,'pronto',{ marca_maquina:'John Deere', clima:'granizo' }),
   makeCampo(4,'capim',30,'crescendo',{
+    marca_maquina: 'Valtra',
     inicio_op: new Date(_n - 5*_d).toISOString(),
     fim_op:    new Date(_n + 9*_d).toISOString(),
   }),
   makeCampo(5,'capim',20,'liberado',{
+    marca_maquina: 'Valtra',
     clima:'normal',
     inicio_pasto: new Date(_n - 12*_d).toISOString(),
     fim_pasto:    new Date(_n + 18*_d).toISOString(),
@@ -522,7 +527,11 @@ function LavouraAdmin({ notify, snd }) {
                         <span style={{fontSize:26}}>{cfg.icon}</span>
                         <div>
                           <div style={{fontSize:14,fontWeight:800,color:'#fff',fontFamily:"'Playfair Display',serif",lineHeight:1}}>{cfg.nome}</div>
-                          <div style={{fontSize:10,color:'rgba(255,255,255,.6)',fontFamily:'var(--font-data)',marginTop:2}}>{campo.area_ha} ha · {campo.marca_maquina} · ${ fmt(campo.custo_total)} custo</div>
+                          <div style={{fontSize:10,color:'rgba(255,255,255,.6)',fontFamily:'var(--font-data)',marginTop:2}}>
+                            {campo.area_ha} ha
+                            {['arando','plantando','colhendo'].includes(campo.status) && ` · ${campo.marca_maquina}`}
+                            {` · $${fmt(campo.custo_total)} custo`}
+                          </div>
                         </div>
                       </div>
                       <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
