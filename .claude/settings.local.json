@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rh \"FROM \\\\|INTO \\\\|UPDATE \" /d/DOCUMENTOS/GitHub/gvrpnl-pecuaria/pages/api --include=*.js)"
+    ]
+  }
+}
