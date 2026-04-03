@@ -26,9 +26,9 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     if (user.role !== 'admin') return res.status(403).json({ error: 'Sem permissão' })
     const { lote_id, jogador_id, fazenda_id } = req.body
-    // 30min indo buscar, 60min chegando na fazenda
-    const buscaEm = new Date(Date.now() + 30 * 60 * 1000)
-    const chegaEm = new Date(Date.now() + 60 * 60 * 1000)
+    // 15min indo buscar, 30min chegando na fazenda
+    const buscaEm = new Date(Date.now() + 15 * 60 * 1000)
+    const chegaEm = new Date(Date.now() + 30 * 60 * 1000)
     const { data, error } = await queryOne(
       `INSERT INTO frete (lote_id, jogador_id, fazenda_id, status, chega_em, busca_em)
        VALUES ($1,$2,$3,'em_rota_buscar',$4,$5) RETURNING *`,

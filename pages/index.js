@@ -1156,14 +1156,14 @@ export default function App() {
               <Card T={T} hover={false}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:T.text,marginBottom:14}}>Registrar compra — Gov. NPC</div>
                 <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:16}}>
-                  <Sel T={T} label="Jogador" value={nLote.jogador_id} onChange={e=>{const u=users.find(x=>x.id===e.target.value);setNLote(f=>({...f,jogador_id:e.target.value,jogador_nome:u?.username||'',fazenda:u?.fazenda||''}))}}>
+                  <Sel T={T} label="Jogador" value={nLote.jogador_id} onChange={e=>{const u=users.find(x=>x.id===e.target.value);const faz=fazendas.find(f=>String(f.dono_id)===String(u?.id));setNLote(f=>({...f,jogador_id:e.target.value,jogador_nome:u?.username||'',fazenda:u?.fazenda||'',fazenda_id:faz?.id||''}))}}>
                     <option value="">Selecione o jogador...</option>
                     {users.filter(u=>u.role==='jogador'&&u.status==='aprovado').map(u=><option key={u.id} value={u.id}>{u.username}{u.fazenda?` — Faz. ${u.fazenda}`:''}</option>)}
                   </Sel>
                   <div style={gs(120)}>
-                    <Sel T={T} label="Fazenda (opcional)" value={nLote.fazenda_id} onChange={e=>setNLote(f=>({...f,fazenda_id:e.target.value}))}>
+                    <Sel T={T} label="Fazenda" value={nLote.fazenda_id} onChange={e=>setNLote(f=>({...f,fazenda_id:e.target.value}))}>
                     <option value="">Sem fazenda vinculada</option>
-                    {fazendas.map(f=><option key={f.id} value={f.id}>{f.codigo} — {f.nome} ({f.tamanho_ha}ha)</option>)}
+                    {fazendas.map(f=><option key={f.id} value={f.id}>{f.codigo} — {f.nome} ({f.tamanho_ha}ha){f.dono_nome?` · ${f.dono_nome}`:''}</option>)}
                   </Sel>
                   <Inp T={T} label="Quantidade" type="number" value={nLote.quantidade} onChange={e=>setNLote(f=>({...f,quantidade:Number(e.target.value)}))}/>
                     <Inp T={T} label="Preço/cab ($)" type="number" value={nLote.valor_compra} onChange={e=>setNLote(f=>({...f,valor_compra:Number(e.target.value)}))}/>
