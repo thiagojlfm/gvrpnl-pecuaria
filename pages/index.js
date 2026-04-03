@@ -1833,25 +1833,29 @@ export default function App() {
               <div style={{fontSize:10,letterSpacing:2,color:'#5c4a42',textTransform:'uppercase',marginBottom:12,fontFamily:'var(--font-data)',paddingLeft:2}}>Concessionária — Equipamentos</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:10}}>
                 {[
-                  {brand:'Valtra',color:'#c0392b',badge:'ENTRADA',icon:'🚜',items:['A110 — Trator ($28k)','SP-20 — Plantadeira ($20k)','CH-50 — Colheitadeira ($52k)'],desc:'Confiável e acessível. Ideal para começar.'},
-                  {brand:'John Deere',color:'#27ae60',badge:'INTERMEDIÁRIO',icon:'🟢',items:['5090E — Trator ($65k)','7000 Precision — Plantadeira ($45k)','S660i — Colheitadeira ($90k)'],desc:'O padrão do mercado. Velocidade e eficiência.'},
-                  {brand:'Case IH',color:'#c0392b',badge:'PREMIUM',icon:'🔴',items:['Farmall 120C — Trator ($110k)','— Plantadeira futura','AF 8250 — Colheitadeira ($145k)'],desc:'Alta performance. Máximo retorno por hora.'},
+                  {brand:'Valtra',img:'/Valtra.jpg',color:'#c0392b',badge:'ENTRADA',items:['A110 — Trator ($28k)','SP-20 — Plantadeira ($20k)','CH-50 — Colheitadeira ($52k)'],desc:'Confiável e acessível. Ideal para começar.'},
+                  {brand:'John Deere',img:'/Johndeere.jpg',color:'#27ae60',badge:'INTERMEDIÁRIO',items:['5090E — Trator ($65k)','7000 Precision — Plantadeira ($45k)','S660i — Colheitadeira ($90k)'],desc:'O padrão do mercado. Velocidade e eficiência.'},
+                  {brand:'Fendt',img:'/fendt.jpg',color:'#2d6a4f',badge:'PREMIUM',items:['Fendt 828 — Trator ($110k)','Fendt Momentum — Plantadeira ($80k)','Fendt IDEAL 9 — Colheitadeira ($145k)'],desc:'Alta performance. O topo do agronegócio mundial.'},
                 ].map(b=>(
-                  <div key={b.brand} style={{background:'#1e1612',border:`1px solid ${b.color}44`,borderTop:`2px solid ${b.color}`,borderRadius:8,padding:'18px 16px',position:'relative',overflow:'hidden'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:800,color:'#eaddcf'}}>{b.brand}</div>
-                      <span style={{fontSize:8,fontWeight:800,letterSpacing:1.5,background:`${b.color}22`,color:b.color,padding:'3px 8px',borderRadius:4,border:`1px solid ${b.color}44`,fontFamily:'var(--font-data)'}}>{b.badge}</span>
+                  <div key={b.brand} style={{background:'#1e1612',border:`1px solid ${b.color}44`,borderTop:`3px solid ${b.color}`,borderRadius:8,overflow:'hidden',position:'relative'}}>
+                    {/* Foto da máquina */}
+                    <div style={{height:160,overflow:'hidden',position:'relative',background:'#0a0706'}}>
+                      <img src={b.img} alt={b.brand} style={{width:'100%',height:'100%',objectFit:'cover',filter:'brightness(.6) saturate(.9)',display:'block',transition:'filter .3s'}} onMouseEnter={e=>e.target.style.filter='brightness(.8) saturate(1)'} onMouseLeave={e=>e.target.style.filter='brightness(.6) saturate(.9)'} onError={e=>e.target.style.display='none'}/>
+                      <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(30,22,18,.95) 0%,rgba(30,22,18,.2) 60%,transparent 100%)'}}/>
+                      <span style={{position:'absolute',top:10,right:10,fontSize:8,fontWeight:800,letterSpacing:1.5,background:`${b.color}cc`,color:'#fff',padding:'3px 8px',borderRadius:4,fontFamily:'var(--font-data)'}}>{b.badge}</span>
                     </div>
-                    <div style={{fontSize:11,color:'#a6968a',marginBottom:12,lineHeight:1.6,fontFamily:'var(--font-mono)'}}>{b.desc}</div>
-                    <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                      {b.items.map(it=>(
-                        <div key={it} style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'#5c4a42',fontFamily:'var(--font-data)'}}>
-                          <div style={{width:4,height:4,borderRadius:'50%',background:b.color,flexShrink:0}}/>
-                          {it}
-                        </div>
-                      ))}
+                    <div style={{padding:'16px 16px 18px'}}>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:800,color:'#eaddcf',marginBottom:6}}>{b.brand}</div>
+                      <div style={{fontSize:11,color:'#a6968a',marginBottom:12,lineHeight:1.6,fontFamily:'var(--font-mono)'}}>{b.desc}</div>
+                      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                        {b.items.map(it=>(
+                          <div key={it} style={{display:'flex',alignItems:'center',gap:8,fontSize:11,color:'#a6968a',fontFamily:'var(--font-data)',background:'#130d0a',borderRadius:5,padding:'6px 10px',border:`1px solid ${b.color}22`}}>
+                            <div style={{width:5,height:5,borderRadius:'50%',background:b.color,flexShrink:0}}/>
+                            {it}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div style={{position:'absolute',bottom:-20,right:-20,fontSize:64,opacity:.04}}>{b.icon}</div>
                   </div>
                 ))}
               </div>
