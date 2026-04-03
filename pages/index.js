@@ -35,7 +35,7 @@ const sounds = {
 
 // ─── CSS Globals — Leilão de Gado Premium ────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Mono:wght@400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&family=DM+Mono:wght@400;500;700&display=swap');
   :root{
     --bg:#150f0c;--panel:#1e1612;--card:#1e1612;--card2:#261c17;--input-bg:#130d0a;
     --border:#36251e;--border2:#523a2f;
@@ -45,13 +45,15 @@ const CSS = `
     --red:#f87171;--red2:#450a0a;
     --ice:#eaddcf;--ice2:#a6968a;--ice3:#5c4a42;
     --font-disp:'Playfair Display',serif;
-    --font-mono:'DM Mono',monospace;
+    --font-mono:'Inter',sans-serif;
     --font-title:'Playfair Display',serif;
     --font-data:'DM Mono',monospace;
+    --radius-btn:10px;
+    --ease:.22s ease;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{font-family:var(--font-mono);background:var(--bg);color:var(--ice);-webkit-font-smoothing:antialiased}
+  body{font-family:var(--font-mono);background:var(--bg);color:var(--ice);-webkit-font-smoothing:antialiased;letter-spacing:.01em}
   ::-webkit-scrollbar{width:4px;height:4px}
   ::-webkit-scrollbar-track{background:var(--bg)}
   ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
@@ -67,8 +69,10 @@ const CSS = `
   @keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
   @keyframes blinkDot{0%,100%{opacity:1}50%{opacity:0}}
   .page-enter{animation:fadeSlideIn .3s cubic-bezier(.4,0,.2,1) both}
-  .card-hover{transition:border-color .15s}
-  .btn-hover{transition:none}
+  .card-hover{transition:border-color var(--ease),box-shadow var(--ease)}
+  .btn-hover{transition:background var(--ease),color var(--ease)}
+  .nav-btn{transition:background var(--ease),color var(--ease),transform .12s ease}
+  .nav-btn:active{transform:scale(.97)}
   .drawer-open{animation:slideRight .28s cubic-bezier(.4,0,.2,1) both}
   @media(max-width:768px){.desktop-only{display:none!important}.mobile-header{display:flex!important}}
   @media(min-width:769px){.mobile-only{display:none!important}.mobile-header{display:none!important}}
@@ -130,7 +134,7 @@ function Metric({label, value, sub, color, T, icon}) {
 function Inp({label, T, hint, ...props}) {
   return <div style={{display:'flex',flexDirection:'column',gap:6}}>
     {label&&<label style={{fontSize:10,color:'var(--ice3)',fontWeight:500,textTransform:'uppercase',letterSpacing:'2px',fontFamily:'var(--font-data)'}}>{label}</label>}
-    <input {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:4,padding:'10px 14px',fontSize:13,color:'var(--ice)',fontFamily:'var(--font-mono)',outline:'none',transition:'border-color .1s',...props.style}} onFocus={e=>{e.target.style.borderColor='var(--rust)';props.onFocus&&props.onFocus(e)}} onBlur={e=>{e.target.style.borderColor='var(--border2)';props.onBlur&&props.onBlur(e)}}/>
+    <input {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:8,padding:'11px 14px',fontSize:13,color:'var(--ice)',fontFamily:"'Inter',sans-serif",outline:'none',transition:'border-color .2s ease,box-shadow .2s ease',...props.style}} onFocus={e=>{e.target.style.borderColor='var(--rust)';e.target.style.boxShadow='0 0 0 3px rgba(194,140,70,.12)';props.onFocus&&props.onFocus(e)}} onBlur={e=>{e.target.style.borderColor='var(--border2)';e.target.style.boxShadow='none';props.onBlur&&props.onBlur(e)}}/>
     {hint&&<div style={{fontSize:10,color:'var(--ice3)',letterSpacing:'1px',fontWeight:300}}>{hint}</div>}
   </div>
 }
@@ -138,7 +142,7 @@ function Inp({label, T, hint, ...props}) {
 function Sel({label, children, T, ...props}) {
   return <div style={{display:'flex',flexDirection:'column',gap:6}}>
     {label&&<label style={{fontSize:10,color:'var(--ice3)',fontWeight:500,textTransform:'uppercase',letterSpacing:'2px',fontFamily:'var(--font-data)'}}>{label}</label>}
-    <select {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:4,padding:'10px 14px',fontSize:13,color:'var(--ice)',fontFamily:'var(--font-mono)',outline:'none',cursor:'pointer',...props.style}}>{children}</select>
+    <select {...props} style={{background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:8,padding:'11px 14px',fontSize:13,color:'var(--ice)',fontFamily:"'Inter',sans-serif",outline:'none',cursor:'pointer',transition:'border-color .2s ease',...props.style}} onFocus={e=>e.target.style.borderColor='var(--rust)'} onBlur={e=>e.target.style.borderColor='var(--border2)'}>{children}</select>
   </div>
 }
 
@@ -153,7 +157,7 @@ function Btn({children, onClick, v='primary', style, disabled, T, sound=true}) {
     green:{bg:'var(--grn2)',border:'1px solid var(--grn)',color:'var(--grn)',hbg:'var(--grn)',hc:'#000'},
   }
   const c=vmap[v]||vmap.primary
-  return <button style={{background:c.bg,border:c.border,color:c.color,borderRadius:6,fontSize:13,fontWeight:600,cursor:disabled?'not-allowed':'pointer',padding:'10px 20px',fontFamily:'var(--font-title)',letterSpacing:'0.5px',opacity:disabled?.4:1,boxShadow:c.shadow||'none',outline:'none',...style}} onClick={()=>{if(sound&&!disabled) sounds.click();onClick&&onClick()}} disabled={disabled} onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background=c.hbg;e.currentTarget.style.color=c.hc}}} onMouseLeave={e=>{e.currentTarget.style.background=c.bg;e.currentTarget.style.color=c.color}} onMouseDown={e=>{if(!disabled)e.currentTarget.style.transform='translate(2px,2px)'}} onMouseUp={e=>{e.currentTarget.style.transform='none'}}>{children}</button>
+  return <button style={{background:c.bg,border:c.border,color:c.color,borderRadius:8,fontSize:13,fontWeight:600,cursor:disabled?'not-allowed':'pointer',padding:'10px 22px',fontFamily:"'Inter',sans-serif",letterSpacing:'0.3px',opacity:disabled?.4:1,boxShadow:c.shadow||'none',outline:'none',transition:'background .2s ease,color .2s ease,transform .12s ease,box-shadow .2s ease',...style}} onClick={()=>{if(sound&&!disabled) sounds.click();onClick&&onClick()}} disabled={disabled} onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background=c.hbg;e.currentTarget.style.color=c.hc;e.currentTarget.style.boxShadow=`0 4px 16px rgba(0,0,0,.3)`}}} onMouseLeave={e=>{e.currentTarget.style.background=c.bg;e.currentTarget.style.color=c.color;e.currentTarget.style.boxShadow=c.shadow||'none'}} onMouseDown={e=>{if(!disabled)e.currentTarget.style.transform='scale(.97)'}} onMouseUp={e=>{e.currentTarget.style.transform='none'}}>{children}</button>
 }
 
 function Tbl({headers, rows, T}) {
@@ -421,15 +425,16 @@ const NAV_ITEMS = [
 
 function Sidebar({page, setPage, user, T, collapsed}) {
   const items = NAV_ITEMS.filter(n=>n.pub||user).filter(n=>!n.admin||user?.role==='admin')
-  return <div style={{width:collapsed?64:200,flexShrink:0,background:T.navBg,borderRight:`1px solid ${T.border}`,display:'flex',flexDirection:'column',padding:'12px 8px',gap:4,transition:'width .25s ease',overflowX:'hidden'}}>
+  return <div style={{width:collapsed?68:212,flexShrink:0,background:T.navBg,borderRight:`1px solid ${T.border}`,display:'flex',flexDirection:'column',padding:'12px 8px',gap:2,transition:'width .25s ease',overflowX:'hidden'}}>
     {items.map(n=>{
       const active = page===n.id
       const idleColor = active ? T.gold : n.hot ? '#f87171' : T.textMuted
-      return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id)}} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:8,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.15)`:n.hot&&!active?'rgba(248,113,113,.06)':'transparent',color:idleColor,transition:'all .15s',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:active?600:400,textAlign:'left'}} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=T.inputBg;e.currentTarget.style.color=T.text}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background=n.hot?'rgba(248,113,113,.06)':'transparent';e.currentTarget.style.color=idleColor}}}>
-        <span style={{fontSize:18,flexShrink:0}}>{n.icon}</span>
-        {!collapsed&&<span>{n.label}</span>}
-        {!collapsed&&n.badge&&!active&&<span style={{marginLeft:'auto',fontSize:8,fontWeight:800,letterSpacing:1,background:n.hot?'rgba(248,113,113,.2)':'rgba(194,140,70,.2)',color:n.hot?'#f87171':T.gold,padding:'2px 5px',borderRadius:3,border:`1px solid ${n.hot?'rgba(248,113,113,.4)':'rgba(194,140,70,.4)'}`}}>{n.badge}</span>}
-        {active&&!collapsed&&<div style={{marginLeft:'auto',width:4,height:4,borderRadius:'50%',background:T.gold}}/>}
+      const activeBg = n.hot ? 'rgba(248,113,113,.18)' : 'rgba(194,140,70,.16)'
+      return <button key={n.id} className="nav-btn" onClick={()=>{sounds.click();setPage(n.id)}} style={{display:'flex',alignItems:'center',gap:10,padding:'11px 14px',borderRadius:10,border:'none',cursor:'pointer',background:active?activeBg:n.hot&&!active?'rgba(248,113,113,.05)':'transparent',color:idleColor,whiteSpace:'nowrap',fontFamily:"'Inter',sans-serif",fontSize:13,fontWeight:active?600:400,textAlign:'left',width:'100%',outline:'none'}} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=T.isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)';e.currentTarget.style.color=T.text}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background=n.hot?'rgba(248,113,113,.05)':'transparent';e.currentTarget.style.color=idleColor}}}>
+        <span style={{fontSize:17,flexShrink:0,lineHeight:1}}>{n.icon}</span>
+        {!collapsed&&<span style={{lineHeight:1}}>{n.label}</span>}
+        {!collapsed&&n.badge&&!active&&<span style={{marginLeft:'auto',fontSize:8,fontWeight:700,letterSpacing:.8,background:n.hot?'rgba(248,113,113,.18)':'rgba(194,140,70,.18)',color:n.hot?'#f87171':T.gold,padding:'2px 6px',borderRadius:5,border:`1px solid ${n.hot?'rgba(248,113,113,.35)':'rgba(194,140,70,.35)'}`}}>{n.badge}</span>}
+        {active&&!collapsed&&!n.badge&&<div style={{marginLeft:'auto',width:5,height:5,borderRadius:'50%',background:n.hot?'#f87171':T.gold,boxShadow:`0 0 6px ${n.hot?'#f87171':T.gold}`}}/>}
         {n.hot&&!active&&!collapsed&&<div style={{marginLeft:n.badge?4:'auto',width:6,height:6,borderRadius:'50%',background:'#f87171',animation:'blinkDot 1s step-end infinite',flexShrink:0}}/>}
       </button>
     })}
@@ -453,12 +458,12 @@ function Drawer({open, onClose, page, setPage, user, T}) {
       </div>
       {items.map(n=>{
         const active = page===n.id
-        return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id);onClose()}} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:8,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.15)`:n.hot&&!active?'rgba(248,113,113,.06)':'transparent',color:active?T.gold:n.hot?'#f87171':T.textMuted,transition:'all .15s',fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:active?600:400,textAlign:'left'}}>
-          <span style={{fontSize:20}}>{n.icon}</span>
-          <span>{n.label}</span>
-          {n.badge&&!active&&<span style={{marginLeft:'auto',fontSize:8,fontWeight:800,letterSpacing:1,background:n.hot?'rgba(248,113,113,.2)':'rgba(194,140,70,.2)',color:n.hot?'#f87171':T.gold,padding:'2px 5px',borderRadius:3}}>{n.badge}</span>}
-          {active&&<div style={{marginLeft:'auto',width:6,height:6,borderRadius:'50%',background:T.gold}}/>}
-          {n.hot&&!active&&<div style={{width:7,height:7,borderRadius:'50%',background:'#f87171',animation:'blinkDot 1s step-end infinite'}}/>}
+        return <button key={n.id} className="nav-btn" onClick={()=>{sounds.click();setPage(n.id);onClose()}} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderRadius:10,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.16)`:n.hot&&!active?'rgba(248,113,113,.05)':'transparent',color:active?T.gold:n.hot?'#f87171':T.textMuted,fontFamily:"'Inter',sans-serif",fontSize:14,fontWeight:active?600:400,textAlign:'left',width:'100%',outline:'none'}} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=T.isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)';e.currentTarget.style.color=T.text}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background=n.hot?'rgba(248,113,113,.05)':'transparent';e.currentTarget.style.color=active?T.gold:n.hot?'#f87171':T.textMuted}}}>
+          <span style={{fontSize:20,lineHeight:1}}>{n.icon}</span>
+          <span style={{lineHeight:1}}>{n.label}</span>
+          {n.badge&&!active&&<span style={{marginLeft:'auto',fontSize:8,fontWeight:700,letterSpacing:.8,background:n.hot?'rgba(248,113,113,.18)':'rgba(194,140,70,.18)',color:n.hot?'#f87171':T.gold,padding:'2px 6px',borderRadius:5,border:`1px solid ${n.hot?'rgba(248,113,113,.35)':'rgba(194,140,70,.35)'}`}}>{n.badge}</span>}
+          {active&&!n.badge&&<div style={{marginLeft:'auto',width:6,height:6,borderRadius:'50%',background:T.gold,boxShadow:`0 0 6px ${T.gold}`}}/>}
+          {n.hot&&!active&&<div style={{marginLeft:n.badge?4:'auto',width:7,height:7,borderRadius:'50%',background:'#f87171',animation:'blinkDot 1s step-end infinite'}}/>}
         </button>
       })}
     </div>
