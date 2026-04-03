@@ -8,7 +8,8 @@
       "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" show --name-only HEAD)",
       "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" status --short)",
       "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" add components/lavoura.js pages/api/concessionaria.js)",
-      "Bash(git -C:*)"
+      "Bash(git -C:*)",
+      "Bash(node -e \"require\\(''''./components/fazendas_components.js''''\\)\")"
     ]
   }
 }
