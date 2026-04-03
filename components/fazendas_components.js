@@ -1728,18 +1728,35 @@ export function ConcessionariaPage({ T, user, api, notify, sounds }) {
                 <img src={m.foto_url} alt={m.modelo} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.75)' }} onError={e=>e.target.style.display='none'}/>
                 <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.7),transparent 50%)' }}/>
                 <div style={{ position:'absolute', bottom:10, left:14 }}>
-                  <span style={{ background:'rgba(10,8,24,.85)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
-                    🐄 {m.capacidade} cab. máx
-                  </span>
+                  {m.tipo?.startsWith('lavoura_') ? (
+                    <span style={{ background:'rgba(10,24,8,.85)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
+                      🌿 {m.capacidade} ha/dia
+                    </span>
+                  ) : (
+                    <span style={{ background:'rgba(10,8,24,.85)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
+                      🐄 {m.capacidade} cab. máx
+                    </span>
+                  )}
                 </div>
               </div>
               <div style={{ padding:'16px 18px' }}>
                 <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:T.text, marginBottom:4 }}>{m.modelo}</div>
                 <div style={{ fontSize:12, color:T.textMuted, marginBottom:8, lineHeight:1.6 }}>{m.descricao}</div>
                 <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
-                  {m.capacidade > 0 && <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🐄 {m.capacidade} cab.</span>}
-                  {(m.racao_cap||0) > 0 && <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border2}`, color:T.gold||'#c8922a', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌾 {fmt(m.racao_cap)}kg ração</span>}
-                  {m.tipo==='racao' && <span style={{ background:'rgba(100,160,80,.1)', border:'1px solid #4a8a30', color:'#6ab840', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>Somente ração</span>}
+                  {m.tipo?.startsWith('lavoura_') ? (
+                    <>
+                      <span style={{ background:'rgba(42,90,18,.15)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌿 {m.capacidade} ha/dia</span>
+                      <span style={{ background:'rgba(60,40,10,.2)', border:'1px solid #6a4010', color:'#c28c46', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>
+                        {{lavoura_trator:'🚜 Trator', lavoura_plantadeira:'🌱 Plantadeira', lavoura_colheitadeira:'⚙️ Colheitadeira'}[m.tipo] || m.tipo}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {m.capacidade > 0 && <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🐄 {m.capacidade} cab.</span>}
+                      {(m.racao_cap||0) > 0 && <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border2}`, color:T.gold||'#c8922a', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌾 {fmt(m.racao_cap)}kg ração</span>}
+                      {m.tipo==='racao' && <span style={{ background:'rgba(100,160,80,.1)', border:'1px solid #4a8a30', color:'#6ab840', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>Somente ração</span>}
+                    </>
+                  )}
                 </div>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                   <div style={{ fontSize:22, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(m.preco)}</div>

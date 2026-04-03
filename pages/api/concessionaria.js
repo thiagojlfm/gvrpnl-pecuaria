@@ -20,13 +20,13 @@ const MAQUINAS_LAVOURA = [
     foto_url:'/Valtra.jpg', tipo:'lavoura_trator',
   },
   {
-    modelo:'John Deere 6M 150', marca:'John Deere',
+    modelo:'John Deere 7J', marca:'John Deere',
     descricao:'Trator intermediário com motor de 150cv e transmissão CommandQuad. Dobra a produtividade no campo.',
     capacidade:70, racao_cap:0, preco:85000,
     foto_url:'/Johndeere.jpg', tipo:'lavoura_trator',
   },
   {
-    modelo:'Fendt 724 Vario', marca:'Fendt',
+    modelo:'Fendt 900 Vario', marca:'Fendt',
     descricao:'O trator mais potente disponível. Transmissão CVT, 240cv e GPS integrado. Máximo rendimento por hectare.',
     capacidade:150, racao_cap:0, preco:130000,
     foto_url:'/fendt.jpg', tipo:'lavoura_trator',
@@ -36,38 +36,38 @@ const MAQUINAS_LAVOURA = [
     modelo:'Valtra SP-20', marca:'Valtra',
     descricao:'Plantadeira de 20 linhas para pequenas e médias propriedades. Simples, eficiente e de fácil regulagem.',
     capacidade:30, racao_cap:0, preco:28000,
-    foto_url:'/Valtra.jpg', tipo:'lavoura_plantadeira',
+    foto_url:'/valtra sp 20.jpg', tipo:'lavoura_plantadeira',
   },
   {
-    modelo:'John Deere DB60', marca:'John Deere',
+    modelo:'John Deere DB 40', marca:'John Deere',
     descricao:'Plantadeira de 36 linhas com dosagem eletrônica de sementes. Precisão milimétrica no plantio.',
     capacidade:70, racao_cap:0, preco:55000,
-    foto_url:'/Johndeere.jpg', tipo:'lavoura_plantadeira',
+    foto_url:'/db 40.jpg', tipo:'lavoura_plantadeira',
   },
   {
     modelo:'Fendt Momentum 12.75', marca:'Fendt',
     descricao:'Plantadeira de alta velocidade com sistema de corte individual. A mais rápida e precisa do mercado.',
     capacidade:150, racao_cap:0, preco:95000,
-    foto_url:'/fendt.jpg', tipo:'lavoura_plantadeira',
+    foto_url:'/momentum.jpg', tipo:'lavoura_plantadeira',
   },
   // ── Colheitadeiras ────────────────────────────────────────────────────────
   {
     modelo:'Valtra BC 6500', marca:'Valtra',
     descricao:'Colheitadeira compacta e ágil para propriedades menores. Plataforma de 25 pés com perda mínima.',
     capacidade:30, racao_cap:0, preco:52000,
-    foto_url:'/Valtra.jpg', tipo:'lavoura_colheitadeira',
+    foto_url:'/valtra bc500.jpg', tipo:'lavoura_colheitadeira',
   },
   {
-    modelo:'John Deere S780', marca:'John Deere',
+    modelo:'John Deere S550', marca:'John Deere',
     descricao:'Colheitadeira de 473cv com trilha axial. Processamento rápido e tanque de 14.000 litros.',
     capacidade:70, racao_cap:0, preco:95000,
-    foto_url:'/Johndeere.jpg', tipo:'lavoura_colheitadeira',
+    foto_url:'/s550.jpg', tipo:'lavoura_colheitadeira',
   },
   {
-    modelo:'Fendt IDEAL 9T', marca:'Fendt',
+    modelo:'Fendt IDEAL 7T', marca:'Fendt',
     descricao:'A colheitadeira mais avançada do mundo. Dois rotores, 790cv e sistema IDEAL Drive. Zero perdas de grão.',
     capacidade:150, racao_cap:0, preco:145000,
-    foto_url:'/fendt.jpg', tipo:'lavoura_colheitadeira',
+    foto_url:'/fendt 7t.jpg', tipo:'lavoura_colheitadeira',
   },
 ]
 
