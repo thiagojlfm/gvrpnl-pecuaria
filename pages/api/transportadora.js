@@ -126,17 +126,17 @@ export default async function handler(req, res) {
     }
 
     const agora = new Date()
-    const chegaBuscar = new Date(agora.getTime() + 30 * 60 * 1000) // 30min indo buscar
-    const chegaFazenda = new Date(agora.getTime() + 60 * 60 * 1000) // 60min total (chegou na fazenda)
+    const chegaBuscar = new Date(agora.getTime() + 15 * 60 * 1000) // 15min indo buscar
+    const chegaFazenda = new Date(agora.getTime() + 30 * 60 * 1000) // 30min total (chegou na fazenda)
 
     // Aceitar blocos — transportador pode pegar múltiplos blocos do mesmo lote
     const blocos_ids = req.body.blocos_ids || [frete_id] // array de IDs de blocos
     const totalQtd = blocos_ids.length === 1 ? frete.quantidade :
       (await query(`SELECT SUM(quantidade) as t FROM fretes_transportadora WHERE id = ANY($1::int[])`, [blocos_ids])).data?.[0]?.t || frete.quantidade
 
-    // Base 1h + 15min por bloco extra
+    // Base 30min + 7min por bloco extra
     const numBlocos = blocos_ids.length
-    const duracaoMs = (60 + (numBlocos - 1) * 15) * 60 * 1000  // 1h base + 15min por bloco extra
+    const duracaoMs = (30 + (numBlocos - 1) * 7) * 60 * 1000  // 30min base + 7min por bloco extra
     const buscaMs = Math.floor(duracaoMs / 2)  // metade do tempo indo buscar
     const chegaBuscarMulti = new Date(agora.getTime() + buscaMs)
     const chegaFazendaMulti = new Date(agora.getTime() + duracaoMs)
