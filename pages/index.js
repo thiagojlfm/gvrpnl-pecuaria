@@ -1947,7 +1947,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 280px',gap:14,alignItems:'start'}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,420px),1fr))',gap:14,alignItems:'start'}}>
               {/* Article */}
               <div style={{background:'#1e1612',border:'1px solid #36251e',borderRadius:10,overflow:'hidden'}}>
                 <div style={{height:5,background:'linear-gradient(90deg,#f87171,#c28c46)'}}/>
@@ -1994,7 +1994,7 @@ export default function App() {
                     {label:'Variação BZR',val:'+18,75%',c:'#4ade80'},
                     {label:'Variação FGR',val:'+16,1%',c:'#4ade80'},
                     {label:'Ração/kg',val:'$2–$3/kg',c:'#c28c46'},
-                    {label:'Margem est.',val:'~35%',c:'#4ade80'},
+                    {label:'Margem est.',val:'~33%',c:'#4ade80'},
                     {label:'Status',val:'EM ALTA',c:'#f87171'},
                   ].map(r=>(
                     <div key={r.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid #36251e'}}>
