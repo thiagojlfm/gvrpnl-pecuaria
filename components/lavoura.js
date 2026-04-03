@@ -456,7 +456,7 @@ function LavouraAdmin({ api, user, notify, snd }) {
           {l:'Ha livre',      v:`${haDisponivel} ha`,                      c:haDisponivel>0?'var(--grn)':'var(--ice2)',s:'para plantar'},
           {l:'Ec. ração',     v:`$${fmt(economiaDia)}/dia`,               c:'#4ade80',                              s:cabecasPasto>0?`${cabecasPasto} cab. pastando`:'sem pasto ativo'},
           {l:'Cap. Pasto',    v:`${pastoTotalAtual.toFixed(0)}/${limiteMaxPasto.toFixed(0)} ha`,
-                                                                           c:capimBloqueado?'#f87171':'#86efac',     s:capimBloqueado?'🔒 Limite máximo (1,8×)':`boost +${fazenda.boostCapim.toFixed(0)} ha`},
+                                                                           c:capimBloqueado?'#f87171':'#86efac',     s:capimBloqueado?'🔒 Limite máximo (1,8×)':`boost +${parseFloat(fazenda.boost_capim||0).toFixed(0)} ha`},
         ].map(m=>(
           <div key={m.l} style={{background:'var(--input-bg)',border:'1px solid var(--border)',borderTop:`2px solid ${m.c}`,borderRadius:6,padding:'14px 16px',boxShadow:'0 2px 10px rgba(0,0,0,.4)'}}>
             <div style={{fontSize:9,color:'var(--ice3)',marginBottom:6,textTransform:'uppercase',letterSpacing:2,fontFamily:'var(--font-data)'}}>{m.l}</div>
@@ -822,8 +822,8 @@ function LavouraAdmin({ api, user, notify, snd }) {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                   {[
-                    ['Base fazenda', `${fazenda.capacidadeBase} ha`,'var(--ice2)'],
-                    ['Boost capim',  `+${fazenda.boostCapim.toFixed(0)} ha`, '#86efac'],
+                    ['Base fazenda', `${parseFloat(fazenda.capacidade_base||40).toFixed(0)} ha`,'var(--ice2)'],
+                    ['Boost capim',  `+${parseFloat(fazenda.boost_capim||0).toFixed(0)} ha`, '#86efac'],
                     ['Total atual',  `${pastoTotalAtual.toFixed(0)} ha`, '#86efac'],
                     ['Limite (1,8×)',`${limiteMaxPasto.toFixed(0)} ha`, capimBloqueado?'#f87171':'var(--ice3)'],
                   ].map(([k,v,c])=>(
