@@ -46,6 +46,21 @@ export default async function handler(req, res) {
     if (tipo === 'caminhoes') {
       if (!user) return res.status(401).json({ error: 'Não autorizado' })
       const id = user.role === 'admin' && jogador_id ? jogador_id : user.id
+
+      // Auto-resolve: libera caminhões cujos fretes já expiraram (chega_em < now)
+      // Garante que o status do caminhão bate com a realidade mesmo se o webhook falhou
+      await query(
+        `UPDATE caminhoes SET status='disponivel'
+         WHERE jogador_id = $1
+           AND status = 'em_rota'
+           AND id NOT IN (
+             SELECT caminhao_id FROM fretes_transportadora
+             WHERE status IN ('em_rota_buscar','em_rota_fazenda','liberado','retirado')
+               AND caminhao_id IS NOT NULL
+           )`,
+        [id]
+      )
+
       const { data } = await query(
         `SELECT * FROM caminhoes WHERE jogador_id = $1 ORDER BY comprado_em DESC`, [id]
       )
