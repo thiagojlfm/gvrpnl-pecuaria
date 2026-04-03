@@ -18,9 +18,10 @@ export default async function handler(req, res) {
 
   // precoKg por fase — varia apenas 5% entre vazio e cheio
   // Mínimo (cheio) garante margem mínima mesmo com ração cara
-  const precoKgGarrote = Number((2.65 + (1 - ratio) * 0.13).toFixed(2)) // 2.65 → 2.78
-  const precoKgBoi     = Number((2.43 + (1 - ratio) * 0.12).toFixed(2)) // 2.43 → 2.55
-  const precoKgAbate   = Number((2.66 + (1 - ratio) * 0.13).toFixed(2)) // 2.66 → 2.79
+  // ⚡ GUERRA DO IRÃ — Preços em alta (Abr/2026)
+  const precoKgGarrote = Number((3.00 + (1 - ratio) * 0.13).toFixed(2)) // 3.00 → 3.13
+  const precoKgBoi     = Number((2.78 + (1 - ratio) * 0.12).toFixed(2)) // 2.78 → 2.90
+  const precoKgAbate   = Number((3.09 + (1 - ratio) * 0.13).toFixed(2)) // 3.09 → 3.22 → abate $2.000+
 
   // Ração sobe com demanda
   let precoRacao = 2.00
@@ -28,7 +29,7 @@ export default async function handler(req, res) {
   else if (rebanho.total > 400) precoRacao = 2.40
 
   // Custos acumulados por fase
-  const custoAteGarrote = 800 + 50 + Math.round(21 * precoRacao * 100) / 100
+  const custoAteGarrote = 950 + 50 + Math.round(21 * precoRacao * 100) / 100
   const custoAteBoi     = custoAteGarrote + Math.round(35 * precoRacao * 100) / 100
   const custoAteAbate   = custoAteBoi + Math.round(56 * precoRacao * 100) / 100
 
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
     precoRacao,
     racaoPorCabeca: 112,
     custoRacao: Math.round(112 * precoRacao * 100) / 100,
-    bezerro: 800,
+    bezerro: 950,
     garrote: Math.round(400 * precoKgGarrote),
     boi:     Math.round(540 * precoKgBoi),
     abate:   Math.round(648 * precoKgAbate),

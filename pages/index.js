@@ -410,6 +410,8 @@ const NAV_ITEMS = [
   {id:'transportadora',icon:'🚛',label:'Transportadora',pub:false},
   {id:'fretes_npc',icon:'🤖',label:'Fretes NPC',pub:false},
   {id:'concessionaria',icon:'🏢',label:'Concessionária',pub:false},
+  {id:'lavoura',icon:'🌱',label:'Lavoura',pub:true,badge:'EM BREVE'},
+  {id:'noticias',icon:'📰',label:'Notícias',pub:true,hot:true},
   {id:'ranking',icon:'🏆',label:'Ranking',pub:true},
   {id:'ajuda',icon:'❓',label:'Ajuda',pub:true},
   {id:'perfil',icon:'👤',label:'Perfil',pub:false},
@@ -422,10 +424,13 @@ function Sidebar({page, setPage, user, T, collapsed}) {
   return <div style={{width:collapsed?64:200,flexShrink:0,background:T.navBg,borderRight:`1px solid ${T.border}`,display:'flex',flexDirection:'column',padding:'12px 8px',gap:4,transition:'width .25s ease',overflowX:'hidden'}}>
     {items.map(n=>{
       const active = page===n.id
-      return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id)}} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:8,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.15)`:'transparent',color:active?T.gold:T.textMuted,transition:'all .15s',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:active?600:400,textAlign:'left'}} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=T.inputBg;e.currentTarget.style.color=T.text}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.color=T.textMuted}}}>
+      const idleColor = active ? T.gold : n.hot ? '#f87171' : T.textMuted
+      return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id)}} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:8,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.15)`:n.hot&&!active?'rgba(248,113,113,.06)':'transparent',color:idleColor,transition:'all .15s',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:active?600:400,textAlign:'left'}} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=T.inputBg;e.currentTarget.style.color=T.text}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background=n.hot?'rgba(248,113,113,.06)':'transparent';e.currentTarget.style.color=idleColor}}}>
         <span style={{fontSize:18,flexShrink:0}}>{n.icon}</span>
         {!collapsed&&<span>{n.label}</span>}
+        {!collapsed&&n.badge&&!active&&<span style={{marginLeft:'auto',fontSize:8,fontWeight:800,letterSpacing:1,background:n.hot?'rgba(248,113,113,.2)':'rgba(194,140,70,.2)',color:n.hot?'#f87171':T.gold,padding:'2px 5px',borderRadius:3,border:`1px solid ${n.hot?'rgba(248,113,113,.4)':'rgba(194,140,70,.4)'}`}}>{n.badge}</span>}
         {active&&!collapsed&&<div style={{marginLeft:'auto',width:4,height:4,borderRadius:'50%',background:T.gold}}/>}
+        {n.hot&&!active&&!collapsed&&<div style={{marginLeft:n.badge?4:'auto',width:6,height:6,borderRadius:'50%',background:'#f87171',animation:'blinkDot 1s step-end infinite',flexShrink:0}}/>}
       </button>
     })}
   </div>
@@ -448,10 +453,12 @@ function Drawer({open, onClose, page, setPage, user, T}) {
       </div>
       {items.map(n=>{
         const active = page===n.id
-        return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id);onClose()}} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:8,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.15)`:'transparent',color:active?T.gold:T.textMuted,transition:'all .15s',fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:active?600:400,textAlign:'left'}}>
+        return <button key={n.id} onClick={()=>{sounds.click();setPage(n.id);onClose()}} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:8,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.15)`:n.hot&&!active?'rgba(248,113,113,.06)':'transparent',color:active?T.gold:n.hot?'#f87171':T.textMuted,transition:'all .15s',fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:active?600:400,textAlign:'left'}}>
           <span style={{fontSize:20}}>{n.icon}</span>
           <span>{n.label}</span>
+          {n.badge&&!active&&<span style={{marginLeft:'auto',fontSize:8,fontWeight:800,letterSpacing:1,background:n.hot?'rgba(248,113,113,.2)':'rgba(194,140,70,.2)',color:n.hot?'#f87171':T.gold,padding:'2px 5px',borderRadius:3}}>{n.badge}</span>}
           {active&&<div style={{marginLeft:'auto',width:6,height:6,borderRadius:'50%',background:T.gold}}/>}
+          {n.hot&&!active&&<div style={{width:7,height:7,borderRadius:'50%',background:'#f87171',animation:'blinkDot 1s step-end infinite'}}/>}
         </button>
       })}
     </div>
@@ -793,6 +800,14 @@ export default function App() {
                   ))}
                 </div>
               </div>
+            </div>
+
+            {/* Breaking news banner */}
+            <div onClick={()=>setPage('noticias')} style={{cursor:'pointer',marginBottom:16,background:'rgba(248,113,113,.08)',border:'1px solid rgba(248,113,113,.35)',borderLeft:'3px solid #f87171',borderRadius:6,padding:'10px 14px',display:'flex',alignItems:'center',gap:10,animation:'fadeSlideIn .4s ease'}} onMouseEnter={e=>e.currentTarget.style.background='rgba(248,113,113,.14)'} onMouseLeave={e=>e.currentTarget.style.background='rgba(248,113,113,.08)'}>
+              <div style={{width:7,height:7,borderRadius:'50%',background:'#f87171',animation:'blinkDot 1s step-end infinite',flexShrink:0}}/>
+              <span style={{fontSize:9,fontWeight:800,letterSpacing:2,color:'#f87171',fontFamily:'var(--font-data)',flexShrink:0}}>URGENTE</span>
+              <span style={{fontSize:12,color:'#eaddcf',fontWeight:600,fontFamily:'var(--font-data)',letterSpacing:0.3}}>Preço do gado dispara com escalada da tensão no Oriente Médio — Bezerro a $950 · Abate acima de $2.000</span>
+              <span style={{marginLeft:'auto',fontSize:10,color:'#f87171',fontWeight:700,flexShrink:0,fontFamily:'var(--font-data)'}}>LER →</span>
             </div>
 
             {/* Header mercado */}
@@ -1765,6 +1780,237 @@ export default function App() {
                     <div style={{fontSize:16,fontWeight:700,color:T.gold,fontFamily:"'Playfair Display',serif"}}>{m.value}</div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>}
+
+          {/* ─── LAVOURA TEASER ─────────────────────────────── */}
+          {page==='lavoura'&&<div style={{animation:'fadeSlideIn .35s ease',maxWidth:900,margin:'0 auto'}}>
+            {/* Hero */}
+            <div style={{textAlign:'center',padding:'40px 20px 32px',marginBottom:8}}>
+              <div style={{display:'inline-flex',alignItems:'center',gap:8,background:'rgba(74,222,128,.08)',border:'1px solid rgba(74,222,128,.25)',borderRadius:20,padding:'5px 16px',marginBottom:20}}>
+                <div style={{width:6,height:6,borderRadius:'50%',background:'#4ade80',animation:'blinkDot 1.2s step-end infinite'}}/>
+                <span style={{fontSize:10,fontWeight:800,letterSpacing:2,color:'#4ade80',fontFamily:'var(--font-data)'}}>EM DESENVOLVIMENTO</span>
+              </div>
+              <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:48,fontWeight:800,color:'#eaddcf',lineHeight:1.1,marginBottom:14}}>Sistema de<br/><span style={{color:'#4ade80'}}>Lavoura</span></h1>
+              <p style={{fontSize:15,color:'#a6968a',maxWidth:540,margin:'0 auto 28px',lineHeight:1.8,fontFamily:'var(--font-mono)'}}>Plante, cultive e colha. Três culturas, equipamentos reais de grandes marcas e uma economia viva — tudo controlado por você, sem passar pelo admin.</p>
+              <div style={{display:'inline-flex',alignItems:'center',gap:24,background:'#1e1612',border:'1px solid #36251e',borderRadius:10,padding:'14px 28px'}}>
+                {[['🌱','Plante suas culturas'],['⏱','Gerencie o tempo'],['💰','Colha seus lucros']].map(([ic,lb])=>(
+                  <div key={lb} style={{textAlign:'center'}}>
+                    <div style={{fontSize:22,marginBottom:4}}>{ic}</div>
+                    <div style={{fontSize:10,color:'#5c4a42',fontFamily:'var(--font-data)',letterSpacing:1,whiteSpace:'nowrap'}}>{lb}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Game Loop */}
+            <div style={{background:'#1e1612',border:'1px solid #36251e',borderRadius:10,padding:'20px 24px',marginBottom:14}}>
+              <div style={{fontSize:10,letterSpacing:2,color:'#5c4a42',textTransform:'uppercase',marginBottom:16,fontFamily:'var(--font-data)'}}>O ciclo de produção</div>
+              <div style={{display:'flex',alignItems:'center',gap:0,overflowX:'auto',paddingBottom:4}}>
+                {[
+                  {icon:'🚜',title:'Arar',sub:'Trator prepara\no solo',color:'#c28c46'},
+                  {icon:'🌾',title:'Plantar',sub:'Sementes +\nAdubo',color:'#a6968a'},
+                  {icon:'🌤',title:'Crescer',sub:'7 a 14 dias\nautomático',color:'#4ade80'},
+                  {icon:'✅',title:'Pronto',sub:'Cultura\nmadura',color:'#4ade80'},
+                  {icon:'🌿',title:'Colher',sub:'Colheitadeira\nem campo',color:'#c28c46'},
+                  {icon:'💵',title:'Vender',sub:'Ração ou\ndinheiro',color:'#4ade80'},
+                ].map((s,i,arr)=>(
+                  <div key={s.title} style={{display:'flex',alignItems:'center',flexShrink:0}}>
+                    <div style={{textAlign:'center',minWidth:90,padding:'12px 8px',background:'#130d0a',border:`1px solid ${s.color}33`,borderRadius:8}}>
+                      <div style={{fontSize:26,marginBottom:6}}>{s.icon}</div>
+                      <div style={{fontSize:12,fontWeight:700,color:s.color,fontFamily:'var(--font-data)',marginBottom:2}}>{s.title}</div>
+                      <div style={{fontSize:9,color:'#5c4a42',whiteSpace:'pre-line',lineHeight:1.4,fontFamily:'var(--font-data)'}}>{s.sub}</div>
+                    </div>
+                    {i<arr.length-1&&<div style={{fontSize:16,color:'#36251e',margin:'0 4px',flexShrink:0}}>→</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Equipamentos */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,letterSpacing:2,color:'#5c4a42',textTransform:'uppercase',marginBottom:12,fontFamily:'var(--font-data)',paddingLeft:2}}>Concessionária — Equipamentos</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:10}}>
+                {[
+                  {brand:'Valtra',color:'#c0392b',badge:'ENTRADA',icon:'🚜',items:['A110 — Trator ($28k)','SP-20 — Plantadeira ($20k)','CH-50 — Colheitadeira ($52k)'],desc:'Confiável e acessível. Ideal para começar.'},
+                  {brand:'John Deere',color:'#27ae60',badge:'INTERMEDIÁRIO',icon:'🟢',items:['5090E — Trator ($65k)','7000 Precision — Plantadeira ($45k)','S660i — Colheitadeira ($90k)'],desc:'O padrão do mercado. Velocidade e eficiência.'},
+                  {brand:'Case IH',color:'#c0392b',badge:'PREMIUM',icon:'🔴',items:['Farmall 120C — Trator ($110k)','— Plantadeira futura','AF 8250 — Colheitadeira ($145k)'],desc:'Alta performance. Máximo retorno por hora.'},
+                ].map(b=>(
+                  <div key={b.brand} style={{background:'#1e1612',border:`1px solid ${b.color}44`,borderTop:`2px solid ${b.color}`,borderRadius:8,padding:'18px 16px',position:'relative',overflow:'hidden'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:800,color:'#eaddcf'}}>{b.brand}</div>
+                      <span style={{fontSize:8,fontWeight:800,letterSpacing:1.5,background:`${b.color}22`,color:b.color,padding:'3px 8px',borderRadius:4,border:`1px solid ${b.color}44`,fontFamily:'var(--font-data)'}}>{b.badge}</span>
+                    </div>
+                    <div style={{fontSize:11,color:'#a6968a',marginBottom:12,lineHeight:1.6,fontFamily:'var(--font-mono)'}}>{b.desc}</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                      {b.items.map(it=>(
+                        <div key={it} style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'#5c4a42',fontFamily:'var(--font-data)'}}>
+                          <div style={{width:4,height:4,borderRadius:'50%',background:b.color,flexShrink:0}}/>
+                          {it}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{position:'absolute',bottom:-20,right:-20,fontSize:64,opacity:.04}}>{b.icon}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Culturas */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:10,marginBottom:14}}>
+              {[
+                {icon:'🌽',name:'Milho',ciclo:'7 dias',custo:'$1.100/ha',receita:'$1.430/ha',lucro:'$330/ha',use:'→ Ração automática',color:'#f5c542',detalhe:'Mais rápido. Melhor para quem tem gado.'},
+                {icon:'🫘',name:'Soja',ciclo:'10 dias',custo:'$1.300/ha',receita:'$1.690/ha',lucro:'$390/ha',use:'→ Dinheiro (addmoney)',color:'#4ade80',detalhe:'Ciclo longo, maior lucro por ciclo.'},
+                {icon:'🌿',name:'Capim',ciclo:'14 dias',custo:'$500/ha',receita:'Capacidade',lucro:'+1,5 ha/ha',use:'→ Expande seu pasto',color:'#86efac',detalhe:'Não é cultivo de dinheiro — expande sua fazenda.'},
+              ].map(c=>(
+                <div key={c.name} style={{background:'#1e1612',border:'1px solid #36251e',borderTop:`2px solid ${c.color}`,borderRadius:8,padding:'16px 14px'}}>
+                  <div style={{fontSize:28,marginBottom:8}}>{c.icon}</div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:'#eaddcf',marginBottom:4}}>{c.name}</div>
+                  <div style={{fontSize:10,color:'#5c4a42',marginBottom:12,fontFamily:'var(--font-data)',lineHeight:1.6}}>{c.detalhe}</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
+                    {[['Ciclo',c.ciclo],['Custo',c.custo],['Receita',c.receita],['Lucro',c.lucro]].map(([k,v])=>(
+                      <div key={k} style={{background:'#130d0a',borderRadius:4,padding:'6px 8px'}}>
+                        <div style={{fontSize:8,color:'#5c4a42',letterSpacing:1,fontFamily:'var(--font-data)'}}>{k.toUpperCase()}</div>
+                        <div style={{fontSize:11,fontWeight:700,color:k==='Lucro'?c.color:'#eaddcf',fontFamily:'var(--font-data)'}}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{fontSize:10,fontWeight:700,color:c.color,fontFamily:'var(--font-data)',letterSpacing:0.5}}>{c.use}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Insumos */}
+            <div style={{background:'#1e1612',border:'1px solid #36251e',borderRadius:10,padding:'20px 24px',marginBottom:14}}>
+              <div style={{fontSize:10,letterSpacing:2,color:'#5c4a42',textTransform:'uppercase',marginBottom:14,fontFamily:'var(--font-data)'}}>Insumos — Você compra, você planta</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
+                {[
+                  {label:'Semente Milho',preco:'$500/ha',icon:'🌽'},
+                  {label:'Semente Soja',preco:'$700/ha',icon:'🫘'},
+                  {label:'Semente Capim',preco:'$300/ha',icon:'🌿'},
+                  {label:'Adubo NPK',preco:'$400/ha',icon:'🧪'},
+                  {label:'Calcário',preco:'$200/ha',icon:'🪨'},
+                ].map(i=>(
+                  <div key={i.label} style={{background:'#130d0a',border:'1px solid #36251e',borderRadius:6,padding:'10px 12px',display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{fontSize:20}}>{i.icon}</span>
+                    <div>
+                      <div style={{fontSize:11,color:'#eaddcf',fontWeight:600,fontFamily:'var(--font-data)'}}>{i.label}</div>
+                      <div style={{fontSize:10,color:'#c28c46',fontFamily:'var(--font-data)',fontWeight:700}}>{i.preco}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Economia target */}
+            <div style={{background:'rgba(74,222,128,.04)',border:'1px solid rgba(74,222,128,.2)',borderRadius:10,padding:'20px 24px',marginBottom:14}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+                <span style={{fontSize:16}}>📊</span>
+                <div style={{fontSize:14,fontWeight:700,color:'#eaddcf',fontFamily:"'Playfair Display',serif"}}>Meta econômica do sistema</div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10}}>
+                {[
+                  {label:'Área referência',value:'70 ha milho',color:'#4ade80'},
+                  {label:'Investimento/ciclo',value:'~$77k',color:'#c28c46'},
+                  {label:'Receita/ciclo',value:'~$100k',color:'#4ade80'},
+                  {label:'Margem alvo',value:'~30%',color:'#4ade80'},
+                  {label:'Prazo de retorno',value:'1 semana',color:'#a6968a'},
+                ].map(m=>(
+                  <div key={m.label} style={{background:'#130d0a',border:'1px solid #36251e',borderRadius:6,padding:'12px 14px'}}>
+                    <div style={{fontSize:8,color:'#5c4a42',letterSpacing:2,textTransform:'uppercase',fontFamily:'var(--font-data)',marginBottom:4}}>{m.label}</div>
+                    <div style={{fontSize:16,fontWeight:700,color:m.color,fontFamily:'var(--font-data)'}}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div style={{textAlign:'center',padding:'24px 0 40px'}}>
+              <div style={{fontSize:11,color:'#5c4a42',fontFamily:'var(--font-data)',letterSpacing:1,marginBottom:8}}>SISTEMA EM CONSTRUÇÃO — FIQUE DE OLHO NAS ATUALIZAÇÕES</div>
+              <div style={{fontSize:13,color:'#a6968a',fontFamily:'var(--font-mono)',lineHeight:1.8}}>O sistema de lavoura será integrado diretamente à sua fazenda.<br/>Tratores, plantadeiras e colheitadeiras disponíveis na Concessionária.</div>
+            </div>
+          </div>}
+
+          {/* ─── NOTÍCIAS ────────────────────────────────────── */}
+          {page==='noticias'&&<div style={{animation:'fadeSlideIn .35s ease',maxWidth:840,margin:'0 auto'}}>
+            {/* Breaking banner */}
+            <div style={{background:'rgba(248,113,113,.08)',border:'1px solid rgba(248,113,113,.35)',borderLeft:'4px solid #f87171',borderRadius:8,padding:'14px 18px',marginBottom:20,display:'flex',alignItems:'center',gap:12}}>
+              <div style={{width:8,height:8,borderRadius:'50%',background:'#f87171',animation:'blinkDot 1s step-end infinite',flexShrink:0}}/>
+              <div>
+                <div style={{fontSize:9,fontWeight:800,letterSpacing:2,color:'#f87171',fontFamily:'var(--font-data)',marginBottom:3}}>AO VIVO · URGENTE · 02 ABR 2026</div>
+                <div style={{fontSize:15,fontWeight:700,color:'#eaddcf',fontFamily:"'Playfair Display',serif",lineHeight:1.3}}>Preço do Gado Dispara devido à Guerra do Irã</div>
+              </div>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'1fr 280px',gap:14,alignItems:'start'}}>
+              {/* Article */}
+              <div style={{background:'#1e1612',border:'1px solid #36251e',borderRadius:10,overflow:'hidden'}}>
+                <div style={{height:5,background:'linear-gradient(90deg,#f87171,#c28c46)'}}/>
+                <div style={{padding:'24px 26px'}}>
+                  <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+                    <span style={{fontSize:9,fontWeight:700,letterSpacing:1.5,background:'rgba(248,113,113,.15)',color:'#f87171',border:'1px solid rgba(248,113,113,.3)',padding:'3px 8px',borderRadius:4,fontFamily:'var(--font-data)'}}>COMMODITIES</span>
+                    <span style={{fontSize:9,fontWeight:700,letterSpacing:1.5,background:'rgba(194,140,70,.15)',color:'#c28c46',border:'1px solid rgba(194,140,70,.3)',padding:'3px 8px',borderRadius:4,fontFamily:'var(--font-data)'}}>MERCADO PECUÁRIO</span>
+                  </div>
+                  <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:800,color:'#eaddcf',lineHeight:1.25,marginBottom:16}}>Escalada militar no Oriente Médio eleva cotação do boi gordo a <span style={{color:'#4ade80'}}>$2.000 por cabeça</span></h2>
+                  <div style={{fontSize:11,color:'#5c4a42',fontFamily:'var(--font-data)',letterSpacing:1,marginBottom:20}}>Por GVRPNL Agência de Notícias · 02 abr. 2026 às 09:41</div>
+
+                  <p style={{fontSize:13,color:'#a6968a',lineHeight:1.9,fontFamily:'var(--font-mono)',marginBottom:16}}>O conflito armado entre Israel e Irã, iniciado na madrugada desta quarta-feira, provocou uma corrida imediata por proteínas animais nos mercados internacionais. A incerteza no fornecimento global de grãos, especialmente de milho e soja provenientes do corredor do Mar Negro, pressionou fortemente os custos de produção — mas também elevou o preço final do boi gordo, que alcançou <strong style={{color:'#eaddcf'}}>$2.000 por cabeça no frigorífico</strong> nas primeiras horas do pregão.</p>
+
+                  <p style={{fontSize:13,color:'#a6968a',lineHeight:1.9,fontFamily:'var(--font-mono)',marginBottom:16}}>O bezerro, que ontem era negociado a $800, sofreu reajuste imediato para <strong style={{color:'#eaddcf'}}>$950</strong>, refletindo a antecipação dos criadores pelo aumento do ciclo completo. Garrotes e bois gordos também registraram alta proporcional, com o mercado ajustando as margens para manter a atratividade de cada fase do ciclo.</p>
+
+                  <p style={{fontSize:13,color:'#a6968a',lineHeight:1.9,fontFamily:'var(--font-mono)',marginBottom:20}}>"O mercado de proteínas está respondendo de forma clássica a um choque de oferta geopolítico," afirmou analista do setor. "Quem tem gado em estoque agora está em posição favorável."</p>
+
+                  <div style={{background:'#130d0a',border:'1px solid #36251e',borderLeft:'3px solid #c28c46',borderRadius:4,padding:'14px 16px',marginBottom:16}}>
+                    <div style={{fontSize:9,color:'#5c4a42',letterSpacing:2,fontFamily:'var(--font-data)',marginBottom:8}}>VARIAÇÃO NO PREGÃO</div>
+                    {[
+                      {fase:'Bezerro · S1',antes:800,depois:950,color:'#7ab0e0'},
+                      {fase:'Garrote · S2',antes:1060,depois:1200,color:'#c28c46'},
+                      {fase:'Boi · S3',antes:1312,depois:1500,color:'#c28c46'},
+                      {fase:'Frigorífico · S4',antes:1724,depois:2002,color:'#4ade80'},
+                    ].map(row=>(
+                      <div key={row.fase} style={{display:'grid',gridTemplateColumns:'1fr auto auto auto',gap:12,alignItems:'center',padding:'7px 0',borderBottom:'1px solid #36251e'}}>
+                        <div style={{fontSize:11,color:'#a6968a',fontFamily:'var(--font-data)'}}>{row.fase}</div>
+                        <div style={{fontSize:11,color:'#5c4a42',fontFamily:'var(--font-data)',textDecoration:'line-through'}}>${row.antes.toLocaleString('pt-BR')}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:row.color,fontFamily:'var(--font-data)'}}>${row.depois.toLocaleString('pt-BR')}</div>
+                        <div style={{fontSize:11,fontWeight:700,color:'#4ade80',fontFamily:'var(--font-data)',minWidth:40,textAlign:'right'}}>+{((row.depois/row.antes-1)*100).toFixed(1)}%</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p style={{fontSize:12,color:'#5c4a42',lineHeight:1.8,fontFamily:'var(--font-mono)'}}>Os preços são dinâmicos e podem oscilar com base no volume do rebanho ativo no servidor. Consulte a aba Mercado para acompanhar as cotações em tempo real.</p>
+                </div>
+              </div>
+
+              {/* Sidebar de notícias */}
+              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                <div style={{background:'#1e1612',border:'1px solid #36251e',borderRadius:8,padding:'16px'}}>
+                  <div style={{fontSize:9,color:'#5c4a42',letterSpacing:2,fontFamily:'var(--font-data)',marginBottom:12,textTransform:'uppercase'}}>Impacto no mercado</div>
+                  {[
+                    {label:'Variação BZR',val:'+18,75%',c:'#4ade80'},
+                    {label:'Variação FGR',val:'+16,1%',c:'#4ade80'},
+                    {label:'Ração/kg',val:'$2–$3/kg',c:'#c28c46'},
+                    {label:'Margem est.',val:'~35%',c:'#4ade80'},
+                    {label:'Status',val:'EM ALTA',c:'#f87171'},
+                  ].map(r=>(
+                    <div key={r.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid #36251e'}}>
+                      <span style={{fontSize:10,color:'#a6968a',fontFamily:'var(--font-data)'}}>{r.label}</span>
+                      <span style={{fontSize:12,fontWeight:700,color:r.c,fontFamily:'var(--font-data)'}}>{r.val}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{background:'rgba(194,140,70,.06)',border:'1px solid rgba(194,140,70,.25)',borderRadius:8,padding:'16px'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'#c28c46',fontFamily:"'Playfair Display',serif",marginBottom:8}}>💡 Dica do Analista</div>
+                  <p style={{fontSize:11,color:'#a6968a',lineHeight:1.7,fontFamily:'var(--font-mono)'}}>Com boi terminado a $2.000, quem fecha o ciclo completo (bezerro → abate) obtém a maior margem histórica do servidor. Mantenha o rebanho saudável e a ração em dia.</p>
+                </div>
+
+                <div style={{background:'rgba(74,222,128,.04)',border:'1px solid rgba(74,222,128,.2)',borderRadius:8,padding:'16px'}}>
+                  <div style={{fontSize:9,color:'#4ade80',letterSpacing:2,fontFamily:'var(--font-data)',marginBottom:10,fontWeight:700}}>EM BREVE</div>
+                  <div style={{fontSize:12,fontWeight:700,color:'#eaddcf',fontFamily:"'Playfair Display',serif",marginBottom:6}}>🌱 Sistema de Lavoura</div>
+                  <p style={{fontSize:11,color:'#a6968a',lineHeight:1.6,fontFamily:'var(--font-mono)',marginBottom:10}}>Plante milho, soja e capim. Compre tratores e colheitadeiras das melhores marcas do agro.</p>
+                  <button onClick={()=>setPage('lavoura')} style={{width:'100%',background:'rgba(74,222,128,.1)',border:'1px solid rgba(74,222,128,.3)',color:'#4ade80',borderRadius:6,padding:'8px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-data)',letterSpacing:1}}>VER PRÉVIA →</button>
+                </div>
               </div>
             </div>
           </div>}
