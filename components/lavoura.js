@@ -123,7 +123,7 @@ const MOCK_FAZENDA_INICIAL = { capacidadeBase: 40, boostCapim: 30 }
 // ═══════════════════════════════════════════════════════════════════════════════
 export function LavouraPage({ T, user, api, notify, sounds: snd = defaultSounds }) {
   if (user?.role !== 'admin') return <LavouraTeaser />
-  return <LavouraAdmin notify={notify} snd={snd} />
+  return <LavouraAdmin api={api} user={user} notify={notify} snd={snd} />
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -238,80 +238,62 @@ function LavouraTeaser() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADMIN PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-function LavouraAdmin({ notify, snd }) {
-  const [garagem,       setGaragem]      = useState(MOCK_GARAGEM)
-  const [campos,        setCampos]        = useState(MOCK_CAMPOS)
-  const [cultura,       setCultura]       = useState('milho')
-  const [haInput,       setHaInput]       = useState(10)
-  const [tick,          setTick]          = useState(0)
-  const [sortando,      setSortando]      = useState(null)
-  // ─── Novos estados de economia integrada ───────────────────────────────────
-  const [estoqueRacao,  setEstoqueRacao]  = useState(0)           // kg de ração em estoque (milho colhido)
-  const [fazenda,       setFazenda]       = useState(MOCK_FAZENDA_INICIAL) // { capacidadeBase, boostCapim }
+function LavouraAdmin({ api, user, notify, snd }) {
+  const [garagem,      setGaragem]   = useState([])
+  const [campos,       setCampos]    = useState([])
+  const [fazenda,      setFazenda]   = useState({ capacidade_base:40, boost_capim:0, limite_max:72, pasto_total:40 })
+  const [estoqueRacao, setEstRacao]  = useState(0)
+  const [cultura,      setCultura]   = useState('milho')
+  const [haInput,      setHaInput]   = useState(10)
+  const [sortando,     setSortando]  = useState(null) // id do campo sendo sortado
+  const [loading,      setLoading]   = useState(true)
+  const [salvando,     setSalvando]  = useState(false)
 
-  // ─── Hard cap de capim ─────────────────────────────────────────────────────
-  // Limite absoluto: 1.8× a capacidade base. O boost é tudo além da base.
-  const limiteMaxPasto  = fazenda.capacidadeBase * 1.8            // ex: 40 * 1.8 = 72 ha máximo
-  const boostMaximo     = limiteMaxPasto - fazenda.capacidadeBase  // ex: 32 ha de boost permitido
-  const pastoTotalAtual = fazenda.capacidadeBase + fazenda.boostCapim
-  const capimBloqueado  = fazenda.boostCapim >= boostMaximo
+  // ─── Carrega dados da API ──────────────────────────────────────────────────
+  async function recarregar() {
+    const [g, c, f, r] = await Promise.all([
+      api('/api/lavoura/garagem'),
+      api('/api/lavoura/campos'),
+      api('/api/lavoura/fazenda'),
+      api('/api/lavoura/racao'),
+    ])
+    if (!g?.error)  setGaragem(g || [])
+    if (!c?.error)  setCampos(c || [])
+    if (!f?.error)  setFazenda(f)
+    if (!r?.error)  setEstRacao(parseFloat(r?.kg_disponivel || 0))
+    setLoading(false)
 
-  // ─── Tick a cada 30s para barras e auto-avanço ────────────────────────────
-  // TODO: Migrar validação de tempo e data para o backend — o frontend usa Date.now()
-  //       para simular progresso, mas um jogador pode alterar o relógio do PC para
-  //       burlar a colheita. A validação real de fim_op deve ocorrer no servidor.
+    // Verifica colheitas concluídas (fim_op já passou) e chama o backend
+    if (!c?.error) {
+      for (const campo of (c || [])) {
+        if (campo.status === 'colhendo' && campo.fim_op && new Date(campo.fim_op) < new Date()) {
+          const res = await api(`/api/lavoura/campos`, {
+            method: 'PATCH',
+            body: JSON.stringify({ id: campo.id, action: 'concluir_colheita' }),
+          })
+          if (!res?.error) {
+            const cIcon = CLIMAS[campo.clima||'normal'].icon
+            const prejuizo = res.lucro !== null && res.lucro < 0
+            if (campo.cultura === 'soja') {
+              notify(`🏦 ADDMONEY — $${fmt(res.receita)} — Soja colhida! ${cIcon}${prejuizo?' ⚠️ PREJUÍZO':''}`, prejuizo?'warn':'success')
+              snd.coin()
+            } else if (campo.cultura === 'milho') {
+              const kg = Math.round(res.receita / PRECO_RACAO)
+              notify(`🌽 Milho colhido! +${fmt(kg)} kg de ração no estoque ${cIcon}${prejuizo?' ⚠️ PREJUÍZO':''}`, prejuizo?'warn':'success')
+              if (!prejuizo) snd.success()
+            }
+          }
+        }
+      }
+    }
+  }
+
+  useEffect(() => { recarregar() }, [])
+
+  // Tick a cada 30s — atualiza barras de progresso e detecta conclusões
+  // Validação de tempo real ocorre no backend (imune a manipulação de relógio)
   useEffect(() => {
-    const iv = setInterval(() => {
-      setTick(t => t + 1)
-      setCampos(prev => prev.map(campo => {
-        const now = Date.now()
-        if (!campo.fim_op || now < new Date(campo.fim_op).getTime()) return campo
-
-        if (campo.status === 'arando') {
-          const durPlant = durMs(campo.area_ha, campo.marca_maquina)
-          return { ...campo, status:'plantando', inicio_op:new Date().toISOString(), fim_op:new Date(now+durPlant).toISOString() }
-        }
-        if (campo.status === 'plantando') {
-          const cicloMs = CULTURAS[campo.cultura].ciclo * _d
-          return { ...campo, status:'crescendo', inicio_op:new Date().toISOString(), fim_op:new Date(now+cicloMs).toISOString() }
-        }
-        if (campo.status === 'crescendo') {
-          return { ...campo, status: campo.cultura==='capim' ? 'pronto_capim' : 'pronto', fim_op:null }
-        }
-        if (campo.status === 'colhendo') {
-          const receita = calcReceita(campo)
-          const lucro   = calcLucro(campo)
-          const cIcon   = CLIMAS[campo.clima||'normal'].icon
-          const prejuizo = lucro !== null && lucro < 0
-
-          // 🫘 Soja — Faucet: addmoney direto, sem estoque
-          if (campo.cultura === 'soja') {
-            notify(
-              `🏦 ADDMONEY — $${fmt(receita)} — Soja colhida! ${cIcon}${prejuizo?' ⚠️ PREJUÍZO':''}`,
-              prejuizo ? 'warn' : 'success'
-            )
-            snd.coin()
-            return { ...campo, status:'colhido', resultado:`$${fmt(receita)} — ADDMONEY`, fim_op:null }
-          }
-
-          // 🌽 Milho — Mercado: vira ração no estoque (vender depois ao Celeiro)
-          if (campo.cultura === 'milho') {
-            const kgRacao = Math.round(receita / PRECO_RACAO)
-            // setTimeout evita side-effect dentro do updater funcional do setCampos
-            setTimeout(() => setEstoqueRacao(e => e + kgRacao), 0)
-            notify(
-              `🌽 Milho colhido! +${fmt(kgRacao)} kg de ração no estoque ${cIcon}${prejuizo?' ⚠️ PREJUÍZO':''}`,
-              prejuizo ? 'warn' : 'success'
-            )
-            if (!prejuizo) snd.success()
-            return { ...campo, status:'colhido', resultado:`+${fmt(kgRacao)} kg ração`, fim_op:null }
-          }
-
-          return { ...campo, status:'colhido', resultado:'Concluído', fim_op:null }
-        }
-        return campo
-      }))
-    }, 30000)
+    const iv = setInterval(recarregar, 30000)
     return () => clearInterval(iv)
   }, [])
 
@@ -319,133 +301,134 @@ function LavouraAdmin({ notify, snd }) {
   const temTipo   = tipo => garagem.some(m => m.tipo === tipo)
   const marcaTipo = tipo => garagem.find(g => g.tipo === tipo)?.marca || null
 
-  const podePlantar  = temTipo('trator') && temTipo('plantadeira')
-  const podeColher   = temTipo('colheitadeira')
-  const marcaTrator  = marcaTipo('trator')
-  const marcaColh    = marcaTipo('colheitadeira')
+  const podePlantar = temTipo('trator') && temTipo('plantadeira')
+  const podeColher  = temTipo('colheitadeira')
+  const marcaTrator = marcaTipo('trator')
+  const marcaColh   = marcaTipo('colheitadeira')
 
-  // Capacidade da frota = menor entre trator e plantadeira (gargalo real)
   const capFrota = podePlantar
     ? Math.min(CAP_MARCA[marcaTrator]||0, CAP_MARCA[marcaTipo('plantadeira')]||0)
     : 0
 
-  const haUsados     = campos.filter(c=>!['colhido','liberado'].includes(c.status)).reduce((s,c)=>s+c.area_ha,0)
+  const haUsados     = campos.filter(c=>!['colhido','liberado'].includes(c.status)).reduce((s,c)=>s+parseFloat(c.area_ha),0)
   const haDisponivel = Math.max(0, capFrota - haUsados)
 
-  const pastosAtivos  = campos.filter(c => c.status === 'liberado')
-  const haPasto       = pastosAtivos.reduce((s,c) => s + c.area_ha * CLIMAS[c.clima||'normal'].capimMult, 0)
-  const cabecasPasto  = Math.floor(haPasto * 1.5)
-  const economiaDia   = Math.round(cabecasPasto * 8 * PRECO_RACAO)
+  const pastosAtivos = campos.filter(c => c.status === 'liberado')
+  const haPasto      = pastosAtivos.reduce((s,c) => s + parseFloat(c.area_ha) * (CLIMAS[c.clima||'normal']?.capimMult||1.5), 0)
+  const cabecasPasto = Math.floor(haPasto * 1.5)
+  const economiaDia  = Math.round(cabecasPasto * 8 * PRECO_RACAO)
 
-  const cfg           = CULTURAS[cultura]
-  const custoPreview  = haInput * cfg.custo
-  const recPreview    = cfg.tipo==='colheita' ? haInput * RECEITA_BASE[cultura] : null
-  const lucroPreview  = recPreview ? recPreview - custoPreview : null
+  // Hard cap de capim (vem do backend, exposto como limite_max)
+  const limiteMaxPasto  = parseFloat(fazenda.limite_max || fazenda.capacidade_base * 1.8)
+  const pastoTotalAtual = parseFloat(fazenda.pasto_total || fazenda.capacidade_base)
+  const capimBloqueado  = pastoTotalAtual >= limiteMaxPasto
+
+  const cfg          = CULTURAS[cultura]
+  const custoPreview = haInput * cfg.custo
+  const recPreview   = cfg.tipo==='colheita' ? haInput * RECEITA_BASE[cultura] : null
+  const lucroPreview = recPreview ? recPreview - custoPreview : null
 
   // ─── Ações ─────────────────────────────────────────────────────────────────
-  function plantar() {
-    if (!podePlantar) return
-
-    if (haInput < 1) {
-      notify('Insira ao menos 1 ha.', 'warn')
-      return
-    }
-    // Validação forte: bloqueia se ha > capacidade máxima da frota
+  async function plantar() {
+    if (!podePlantar || salvando) return
+    if (haInput < 1) { notify('Insira ao menos 1 ha.', 'warn'); return }
     if (haInput > capFrota) {
-      notify(`⚠️ Sua frota opera no máximo ${capFrota} ha/dia. Compre máquinas melhores na Concessionária.`, 'warn')
-      return
+      notify(`⚠️ Sua frota opera no máximo ${capFrota} ha/dia.`, 'warn'); return
     }
     if (haInput > haDisponivel) {
-      notify(`⚠️ Só há ${haDisponivel} ha operacional disponível agora.`, 'warn')
-      return
+      notify(`⚠️ Só há ${haDisponivel} ha disponível agora.`, 'warn'); return
     }
-    // Bloqueia capim se hard cap de pasto atingido
     if (cultura === 'capim' && capimBloqueado) {
-      notify(`🌿 Limite de pasto atingido! Sua fazenda chegou ao máximo de ${limiteMaxPasto.toFixed(0)} ha de pasto (${fazenda.capacidadeBase} ha base × 1,8).`, 'warn')
-      return
+      notify(`🌿 Limite de pasto atingido! Máximo: ${limiteMaxPasto.toFixed(0)} ha (base × 1,8).`, 'warn'); return
     }
-
+    setSalvando(true)
+    const r = await api('/api/lavoura/campos', {
+      method: 'POST',
+      body: JSON.stringify({ cultura, area_ha: haInput, marca_maquina: marcaTrator }),
+    })
+    setSalvando(false)
+    if (r?.error) { notify('Erro: ' + r.error, 'warn'); return }
     snd.success()
-    const durArar = durMs(haInput, marcaTrator)
-    const now     = Date.now()
-    const novo    = {
-      id: now, cultura, area_ha:haInput, marca_maquina:marcaTrator,
-      status:'arando', custo_total:haInput * cfg.custo,
-      inicio_op: new Date(now).toISOString(),
-      fim_op:    new Date(now + durArar).toISOString(),
-      clima:null, resultado:null,
-    }
-    setCampos(prev => [...prev, novo])
-    notify(`🚜 Arando ${haInput} ha de ${cfg.nome} — ${tempoStr(novo.fim_op)} para concluir`, 'info')
+    notify(`🚜 Arando ${haInput} ha de ${cfg.nome} — ${tempoStr(r.fim_op)} para concluir`, 'info')
     setHaInput(Math.min(10, Math.max(1, haDisponivel - haInput)))
+    await recarregar()
   }
 
-  function iniciarColheita(campoId) {
-    if (!podeColher) return
-    const campo   = campos.find(c => c.id === campoId)
-    if (!campo) return
-    const durColh = durMs(campo.area_ha, marcaColh)
-    const now     = Date.now()
-    setCampos(prev => prev.map(c => c.id !== campoId ? c : {
-      ...c, status:'colhendo',
-      inicio_op: new Date(now).toISOString(),
-      fim_op:    new Date(now + durColh).toISOString(),
-    }))
-    notify(`⚙️ Colheitadeira em campo — ${tempoStr(new Date(now+durColh).toISOString())} para concluir`, 'info')
+  async function iniciarColheita(campoId) {
+    if (!podeColher || salvando) return
+    setSalvando(true)
+    const r = await api('/api/lavoura/campos', {
+      method: 'PATCH',
+      body: JSON.stringify({ id: campoId, action: 'iniciar_colheita' }),
+    })
+    setSalvando(false)
+    if (r?.error) { notify('Erro: ' + r.error, 'warn'); return }
+    notify(`⚙️ Colheitadeira em campo — ${tempoStr(r.fim_op)} para concluir`, 'info')
+    await recarregar()
   }
 
-  function liberarCapim(campoId) {
-    const campo = campos.find(c => c.id === campoId)
-    if (!campo) return
-    const cli          = CLIMAS[campo.clima || 'normal']
-    const haPastoGerado = parseFloat((campo.area_ha * cli.capimMult).toFixed(1))
-    // Aplica o boost respeitando o hard cap
-    const novoBoost    = Math.min(fazenda.boostCapim + haPastoGerado, boostMaximo)
-    const pastoNovo    = fazenda.capacidadeBase + novoBoost
-
+  async function liberarCapim(campoId) {
+    if (salvando) return
+    setSalvando(true)
+    const r = await api('/api/lavoura/campos', {
+      method: 'PATCH',
+      body: JSON.stringify({ id: campoId, action: 'liberar_capim' }),
+    })
+    setSalvando(false)
+    if (r?.error) { notify('Erro: ' + r.error, 'warn'); return }
     snd.success()
-    const now = Date.now()
-    setCampos(prev => prev.map(c => c.id !== campoId ? c : {
-      ...c, status:'liberado',
-      inicio_pasto: new Date(now).toISOString(),
-      fim_pasto:    new Date(now + 30*_d).toISOString(),
-    }))
-    setFazenda(f => ({ ...f, boostCapim: novoBoost }))
-    notify(
-      `🌿 Pasto liberado! +${haPastoGerado} ha. Capacidade total: ${pastoNovo.toFixed(0)} / ${limiteMaxPasto.toFixed(0)} ha`,
-      'success'
-    )
+    notify(`🌿 Pasto liberado! +${r.haPastoGerado} ha. Total: ${(parseFloat(fazenda.capacidade_base) + r.novoBoost).toFixed(0)} / ${limiteMaxPasto.toFixed(0)} ha`, 'success')
+    await recarregar()
   }
 
-  function revelarClima(campoId) {
-    const clima = sortearClima()
+  async function revelarClima(campoId) {
+    if (sortando || salvando) return
     setSortando(campoId)
-    setTimeout(() => {
-      setCampos(prev => prev.map(c => c.id !== campoId ? c : { ...c, clima }))
+    // Animação de 1.2s antes de chamar API
+    setTimeout(async () => {
+      const r = await api('/api/lavoura/campos', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: campoId, action: 'revelar_clima' }),
+      })
       setSortando(null)
-      const cl = CLIMAS[clima]
+      if (r?.error) { notify('Erro: ' + r.error, 'warn'); return }
+      const cl = CLIMAS[r.clima]
       const efeito = cl.mult < 1 ? `${Math.round((cl.mult-1)*100)}% produção` : cl.mult > 1 ? `+${Math.round((cl.mult-1)*100)}% produção` : 'sem alteração'
-      notify(`${cl.icon} Clima revelado: ${cl.label} — ${efeito}`, clima==='granizo'||clima==='praga'?'warn':'success')
-      if (clima==='ideal') snd.success()
+      notify(`${cl.icon} Clima revelado: ${cl.label} — ${efeito}`, r.clima==='granizo'||r.clima==='praga'?'warn':'success')
+      if (r.clima==='ideal') snd.success()
       else snd.click && snd.click()
+      await recarregar()
     }, 1200)
   }
 
+  async function venderRacaoCeleiro() {
+    if (salvando || estoqueRacao <= 0) return
+    setSalvando(true)
+    const r = await api('/api/lavoura/racao', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'vender_celeiro' }),
+    })
+    setSalvando(false)
+    if (r?.error) { notify('Erro: ' + r.error, 'warn'); return }
+    notify(`🏦 ADDMONEY — $${fmt(r.valor)} — Ração vendida ao Celeiro! (${fmt(r.kg_vendido)} kg)`, 'success')
+    snd.coin()
+    await recarregar()
+  }
+
   function limparCampo(campoId) {
+    // Apenas remove do estado local (campos colhidos são só histórico)
     setCampos(prev => prev.filter(c => c.id !== campoId))
   }
 
-  // 🌽 Vender ração ao Celeiro
-  function venderRacaoCeleiro() {
-    const valor = estoqueRacao * PRECO_RACAO
-    notify(`🏦 ADDMONEY — $${fmt(valor)} — Ração vendida ao Celeiro! (${fmt(estoqueRacao)} kg)`, 'success')
-    snd.coin()
-    setEstoqueRacao(0)
-    // TODO: Integrar com API real do Celeiro — POST /api/celeiro/vender { kg, valor }
-  }
-
-  const camposAtivos   = campos.filter(c => !['colhido'].includes(c.status))
+  const camposAtivos   = campos.filter(c => c.status !== 'colhido')
   const camposColhidos = campos.filter(c => c.status === 'colhido')
+
+  if (loading) return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:300,color:'var(--ice3)',fontFamily:'var(--font-data)',fontSize:13,gap:12}}>
+      <div style={{width:16,height:16,borderRadius:'50%',border:'2px solid var(--gold)',borderTopColor:'transparent',animation:'spin .8s linear infinite'}}/>
+      Carregando lavoura...
+    </div>
+  )
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
