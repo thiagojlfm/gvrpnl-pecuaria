@@ -1626,13 +1626,20 @@ function FreteEmAndamento({ frete, T, onEntregue, api }) {
 }
 
 // ─── Concessionaria Page ──────────────────────────────────────────────────────
+const CONCE_TABS = [
+  { v:'caminhoes',      l:'🚛 Caminhões',      fn: m => !m.tipo?.startsWith('lavoura_') },
+  { v:'tratores',       l:'🚜 Tratores',       fn: m => m.tipo === 'lavoura_trator' },
+  { v:'implementos',    l:'🌱 Implementos',    fn: m => m.tipo === 'lavoura_plantadeira' },
+  { v:'colheitadeiras', l:'⚙️ Colheitadeiras', fn: m => m.tipo === 'lavoura_colheitadeira' },
+]
+
 export function ConcessionariaPage({ T, user, api, notify, sounds }) {
   const [modelos, setModelos] = useState([])
   const [pedidos, setPedidos] = useState([])
-  const [meusPedidos, setMeusPedidos] = useState([])
   const [comprovante, setComprovante] = useState('')
   const [modeloSel, setModeloSel] = useState(null)
   const [step, setStep] = useState(1)
+  const [tabCat, setTabCat] = useState('caminhoes')
 
   const load = useCallback(async () => {
     const m = await fetch('/api/concessionaria').then(r=>r.json())
@@ -1645,7 +1652,7 @@ export function ConcessionariaPage({ T, user, api, notify, sounds }) {
 
   useEffect(() => { load() }, [load])
 
-  async function comprarCaminhao() {
+  async function comprarModelo() {
     if (!comprovante) return notify('Cole o comprovante!', 'danger')
     const r = await api('/api/concessionaria', {
       method: 'POST',
@@ -1657,32 +1664,40 @@ export function ConcessionariaPage({ T, user, api, notify, sounds }) {
   }
 
   const pedidosPend = pedidos.filter(p => p.status === 'pendente')
+  const tabInfo = CONCE_TABS.find(t => t.v === tabCat) || CONCE_TABS[0]
+  const modelosFiltrados = modelos.filter(tabInfo.fn)
+  const isLavoura = modeloSel?.tipo?.startsWith('lavoura_')
+  const tipoEmoji = isLavoura
+    ? { lavoura_trator:'🚜', lavoura_plantadeira:'🌱', lavoura_colheitadeira:'⚙️' }[modeloSel?.tipo] || '🚜'
+    : '🚛'
 
   return (
     <div>
-      <div style={{ marginBottom:28, paddingBottom:16, borderBottom:`1px solid ${T.border}` }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
-          <span style={{ fontSize:24 }}>🏢</span>
-          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:700, color:T.text }}>Concessionária</h1>
+      {/* Header */}
+      <div style={{ marginBottom:20, paddingBottom:14, borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:2 }}>
+          <span style={{ fontSize:22 }}>🏢</span>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700, color:T.text }}>Concessionária</h1>
         </div>
-        <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Compre seu caminhão e entre no mercado de fretes</p>
+        <p style={{ fontSize:12, color:T.textMuted, marginLeft:34 }}>Caminhões, tratores e implementos agrícolas</p>
       </div>
 
+      {/* Admin: pedidos pendentes */}
       {user?.role === 'admin' && pedidosPend.length > 0 && (
-        <div style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:18, marginBottom:20 }}>
-          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:15, fontWeight:700, color:T.text, marginBottom:14 }}>
+        <div style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:16, marginBottom:18 }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:14, fontWeight:700, color:T.text, marginBottom:12 }}>
             Pedidos pendentes <Badge type="amber">{pedidosPend.length}</Badge>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {pedidosPend.map(p => (
-              <div key={p.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:T.inputBg, borderRadius:10, border:`1px solid ${T.border2}`, flexWrap:'wrap' }}>
-                <div style={{ flex:1 }}>
+              <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:T.inputBg, borderRadius:10, border:`1px solid ${T.border2}`, flexWrap:'wrap' }}>
+                <div style={{ flex:1, minWidth:140 }}>
                   <div style={{ fontSize:13, fontWeight:700, color:T.text }}>{p.jogador_nome}</div>
-                  <div style={{ fontSize:12, color:T.textMuted }}>{p.modelo_nome} · ${fmt(p.valor)}</div>
+                  <div style={{ fontSize:11, color:T.textMuted }}>{p.modelo_nome} · ${fmt(p.valor)}</div>
                   {p.comprovante && <a href={p.comprovante} target="_blank" rel="noreferrer" style={{ fontSize:11, color:'#4a90d0' }}>Ver comprovante →</a>}
                 </div>
                 <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={async()=>{await api('/api/concessionaria',{method:'PATCH',body:JSON.stringify({id:p.id,status:'aprovado'})});sounds?.success();notify('✓ Caminhão entregue!');load()}} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>✓ Entregar</button>
+                  <button onClick={async()=>{await api('/api/concessionaria',{method:'PATCH',body:JSON.stringify({id:p.id,status:'aprovado'})});sounds?.success();notify('✓ Entregue!');load()}} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>✓ Entregar</button>
                   <button onClick={async()=>{await api('/api/concessionaria',{method:'PATCH',body:JSON.stringify({id:p.id,status:'recusado'})});notify('Recusado.');load()}} style={{ padding:'6px 10px', background:'#3a0808', color:'#e06060', border:'1px solid #6a1818', borderRadius:8, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>✗</button>
                 </div>
               </div>
@@ -1691,81 +1706,125 @@ export function ConcessionariaPage({ T, user, api, notify, sounds }) {
         </div>
       )}
 
+      {/* Step 3: confirmação */}
       {step === 3 ? (
-        <div style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:48, textAlign:'center', maxWidth:480, margin:'0 auto' }}>
-          <div style={{ fontSize:56, marginBottom:16 }}>🚛</div>
-          <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, color:'#a080ff', marginBottom:10 }}>Pedido enviado!</h2>
-          <p style={{ fontSize:14, color:T.textMuted, lineHeight:1.8, marginBottom:20 }}>O admin irá verificar seu comprovante e entregar o caminhão na sua garagem.</p>
+        <div style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:40, textAlign:'center', maxWidth:440, margin:'0 auto' }}>
+          <div style={{ fontSize:52, marginBottom:14 }}>{tipoEmoji}</div>
+          <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:20, color:'#a080ff', marginBottom:8 }}>Pedido enviado!</h2>
+          <p style={{ fontSize:13, color:T.textMuted, lineHeight:1.8, marginBottom:18 }}>O admin irá verificar seu comprovante e entregar na sua garagem.</p>
           <button onClick={()=>{setStep(1);setModeloSel(null);setComprovante('')}} style={{ padding:'9px 20px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Ver outro modelo</button>
         </div>
+
+      /* Step 2: comprar */
       ) : step === 2 && modeloSel ? (
-        <div style={{ maxWidth:480, margin:'0 auto' }}>
-          <div style={{ background:T.card, border:'1px solid #3020a0', borderRadius:14, padding:24, marginBottom:16 }}>
-            <div style={{ display:'flex', gap:16, alignItems:'center', marginBottom:16 }}>
-              <span style={{ fontSize:40 }}>🚛</span>
+        <div style={{ maxWidth:460, margin:'0 auto' }}>
+          <div style={{ background:T.card, border:'1px solid #3020a0', borderRadius:14, padding:22, marginBottom:14 }}>
+            <div style={{ display:'flex', gap:14, alignItems:'center', marginBottom:14 }}>
+              <span style={{ fontSize:36 }}>{tipoEmoji}</span>
               <div>
-                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:T.text }}>{modeloSel.modelo}</div>
-                <div style={{ fontSize:12, color:T.textMuted }}>{modeloSel.capacidade} cabeças máx · ${fmt(modeloSel.preco)}</div>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:T.text }}>{modeloSel.modelo}</div>
+                <div style={{ fontSize:12, color:T.textMuted }}>
+                  {isLavoura ? `${modeloSel.capacidade} ha/dia` : `${modeloSel.capacidade} cabeças máx`} · ${fmt(modeloSel.preco)}
+                </div>
               </div>
             </div>
-            <div style={{ marginBottom:16 }}>
-              <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:8 }}>Link do comprovante (Discord)</label>
-              <input value={comprovante} onChange={e=>setComprovante(e.target.value)} placeholder="https://discord.com/channels/..." style={{ width:'100%', background:T.inputBg, border:`1px solid ${T.border2}`, borderRadius:10, padding:'10px 14px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:7 }}>Link do comprovante (Discord)</label>
+              <input value={comprovante} onChange={e=>setComprovante(e.target.value)} placeholder="https://discord.com/channels/..." style={{ width:'100%', boxSizing:'border-box', background:T.inputBg, border:`1px solid ${T.border2}`, borderRadius:10, padding:'10px 14px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
             </div>
             <div style={{ display:'flex', gap:10 }}>
               <button onClick={()=>setStep(1)} style={{ flex:1, padding:10, background:'transparent', border:`1px solid ${T.border2}`, color:T.textDim, borderRadius:10, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Voltar</button>
-              <button onClick={comprarCaminhao} style={{ flex:2, padding:10, background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar — ${fmt(modeloSel.preco)}</button>
+              <button onClick={comprarModelo} style={{ flex:2, padding:10, background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar — ${fmt(modeloSel.preco)}</button>
             </div>
           </div>
         </div>
+
+      /* Step 1: catálogo */
       ) : (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:16 }}>
-          {modelos.map(m => (
-            <div key={m.id} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, overflow:'hidden', transition:'all .25s', cursor:'pointer' }}
-              onMouseEnter={e=>{e.currentTarget.style.border='1px solid #5030c0';e.currentTarget.style.transform='translateY(-4px)'}}
-              onMouseLeave={e=>{e.currentTarget.style.border=`1px solid ${T.border}`;e.currentTarget.style.transform='translateY(0)'}}>
-              <div style={{ height:160, overflow:'hidden', background:'#0a0808', position:'relative' }}>
-                <img src={m.foto_url} alt={m.modelo} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.75)' }} onError={e=>e.target.style.display='none'}/>
-                <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.7),transparent 50%)' }}/>
-                <div style={{ position:'absolute', bottom:10, left:14 }}>
-                  {m.tipo?.startsWith('lavoura_') ? (
-                    <span style={{ background:'rgba(10,24,8,.85)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
-                      🌿 {m.capacidade} ha/dia
-                    </span>
-                  ) : (
-                    <span style={{ background:'rgba(10,8,24,.85)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
-                      🐄 {m.capacidade} cab. máx
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div style={{ padding:'16px 18px' }}>
-                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:T.text, marginBottom:4 }}>{m.modelo}</div>
-                <div style={{ fontSize:12, color:T.textMuted, marginBottom:8, lineHeight:1.6 }}>{m.descricao}</div>
-                <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
-                  {m.tipo?.startsWith('lavoura_') ? (
-                    <>
-                      <span style={{ background:'rgba(42,90,18,.15)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌿 {m.capacidade} ha/dia</span>
-                      <span style={{ background:'rgba(60,40,10,.2)', border:'1px solid #6a4010', color:'#c28c46', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>
-                        {{lavoura_trator:'🚜 Trator', lavoura_plantadeira:'🌱 Plantadeira', lavoura_colheitadeira:'⚙️ Colheitadeira'}[m.tipo] || m.tipo}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      {m.capacidade > 0 && <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🐄 {m.capacidade} cab.</span>}
-                      {(m.racao_cap||0) > 0 && <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border2}`, color:T.gold||'#c8922a', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌾 {fmt(m.racao_cap)}kg ração</span>}
-                      {m.tipo==='racao' && <span style={{ background:'rgba(100,160,80,.1)', border:'1px solid #4a8a30', color:'#6ab840', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>Somente ração</span>}
-                    </>
-                  )}
-                </div>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                  <div style={{ fontSize:22, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(m.preco)}</div>
-                  <button onClick={()=>{setModeloSel(m);setStep(2)}} style={{ padding:'8px 16px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar</button>
-                </div>
-              </div>
+        <>
+          {/* Tabs — scrollável no mobile */}
+          <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch', marginBottom:18, paddingBottom:4 }}>
+            <div style={{ display:'flex', gap:8, minWidth:'max-content' }}>
+              {CONCE_TABS.map(t => {
+                const cnt = modelos.filter(t.fn).length
+                const ativo = tabCat === t.v
+                return (
+                  <button key={t.v} onClick={()=>setTabCat(t.v)} style={{
+                    padding:'8px 16px', borderRadius:22,
+                    border:`1px solid ${ativo ? '#5030c0' : T.border}`,
+                    background: ativo ? 'rgba(80,48,192,.22)' : 'transparent',
+                    color: ativo ? '#a080ff' : T.textMuted,
+                    fontSize:13, cursor:'pointer', fontFamily:'inherit',
+                    fontWeight: ativo ? 700 : 400,
+                    whiteSpace:'nowrap', transition:'all .15s',
+                    display:'flex', alignItems:'center', gap:6,
+                  }}>
+                    {t.l}
+                    <span style={{ background: ativo?'rgba(160,128,255,.25)':T.inputBg, color: ativo?'#a080ff':T.textMuted, fontSize:11, fontWeight:700, borderRadius:10, padding:'1px 7px', border:`1px solid ${ativo?'#5030c0':T.border}` }}>{cnt}</span>
+                  </button>
+                )
+              })}
             </div>
-          ))}
-        </div>
+          </div>
+
+          {/* Grid de modelos */}
+          {modelosFiltrados.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontSize:13 }}>Nenhum modelo disponível nesta categoria.</div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:14 }}>
+              {modelosFiltrados.map(m => {
+                const isLav = m.tipo?.startsWith('lavoura_')
+                return (
+                  <div key={m.id} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, overflow:'hidden', transition:'all .22s', cursor:'pointer' }}
+                    onMouseEnter={e=>{e.currentTarget.style.border='1px solid #5030c0';e.currentTarget.style.transform='translateY(-3px)'}}
+                    onMouseLeave={e=>{e.currentTarget.style.border=`1px solid ${T.border}`;e.currentTarget.style.transform='translateY(0)'}}>
+                    {/* Foto */}
+                    <div style={{ height:150, overflow:'hidden', background:'#0a0a0a', position:'relative' }}>
+                      <img src={m.foto_url} alt={m.modelo} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.75)' }} onError={e=>e.target.style.display='none'}/>
+                      <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.7),transparent 50%)' }}/>
+                      <div style={{ position:'absolute', bottom:9, left:12 }}>
+                        {isLav ? (
+                          <span style={{ background:'rgba(10,24,8,.9)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
+                            🌿 {m.capacidade} ha/dia
+                          </span>
+                        ) : (
+                          <span style={{ background:'rgba(10,8,24,.9)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
+                            🐄 {m.capacidade > 0 ? `${m.capacidade} cab.` : 'Somente ração'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Info */}
+                    <div style={{ padding:'14px 16px' }}>
+                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700, color:T.text, marginBottom:3 }}>{m.modelo}</div>
+                      <div style={{ fontSize:12, color:T.textMuted, marginBottom:8, lineHeight:1.6 }}>{m.descricao}</div>
+                      <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
+                        {isLav ? (
+                          <>
+                            <span style={{ background:'rgba(42,90,18,.15)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌿 {m.capacidade} ha/dia</span>
+                            <span style={{ background:'rgba(60,40,10,.2)', border:'1px solid #6a4010', color:'#c28c46', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>
+                              {{lavoura_trator:'🚜 Trator', lavoura_plantadeira:'🌱 Plantadeira', lavoura_colheitadeira:'⚙️ Colheitadeira'}[m.tipo] || m.tipo}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            {m.capacidade > 0 && <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🐄 {m.capacidade} cab.</span>}
+                            {(m.racao_cap||0) > 0 && <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border2}`, color:T.gold||'#c8922a', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌾 {fmt(m.racao_cap)}kg ração</span>}
+                            {m.tipo==='racao' && <span style={{ background:'rgba(100,160,80,.1)', border:'1px solid #4a8a30', color:'#6ab840', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>Somente ração</span>}
+                          </>
+                        )}
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        <div style={{ fontSize:20, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(m.preco)}</div>
+                        <button onClick={()=>{setModeloSel(m);setStep(2)}} style={{ padding:'8px 16px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar</button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
