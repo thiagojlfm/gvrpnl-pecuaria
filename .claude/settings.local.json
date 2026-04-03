@@ -5,7 +5,10 @@
       "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" status)",
       "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" status --short pages/)",
       "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" log --oneline -3)",
-      "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" show --name-only HEAD)"
+      "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" show --name-only HEAD)",
+      "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" status --short)",
+      "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" add components/lavoura.js pages/api/concessionaria.js)",
+      "Bash(git -C:*)"
     ]
   }
 }
