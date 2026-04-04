@@ -6,18 +6,37 @@ export default async function handler(req, res) {
   const user  = token ? verifyToken(token) : null
   if (!user) return res.status(401).json({ error: 'Não autorizado' })
 
-  // GET — lista garagem do jogador (ou de qualquer jogador se admin)
+  // GET — lista garagem do jogador (próprias + alugadas ativas)
   if (req.method === 'GET') {
     const jogador_id = req.query.jogador_id || user.id
-    const { data, error } = await query(
-      `SELECT * FROM lavoura_garagem WHERE jogador_id = $1 ORDER BY criado_em ASC`,
-      [jogador_id]
-    )
-    if (error) return res.status(500).json({ error: error.message })
-    return res.json(data || [])
+
+    // Máquinas próprias (com info de aluguel ativo, se houver)
+    const { data: proprias } = await query(`
+      SELECT lg.*,
+        la.locatario_nome AS alugado_para_nome,
+        la.fim_aluguel    AS alugado_ate,
+        la.id             AS aluguel_id
+      FROM lavoura_garagem lg
+      LEFT JOIN lavoura_alugueis la
+        ON la.maquina_id = lg.id AND la.status = 'ativo'
+      WHERE lg.jogador_id = $1
+      ORDER BY lg.criado_em ASC
+    `, [jogador_id])
+
+    // Máquinas alugadas de outros jogadores (ativas)
+    const { data: alugadas } = await query(`
+      SELECT lg.id, lg.tipo, lg.marca, lg.nome, lg.capacidade,
+             la.fim_aluguel, la.dono_nome, la.id AS aluguel_id,
+             true AS alugado
+      FROM lavoura_alugueis la
+      JOIN lavoura_garagem lg ON lg.id = la.maquina_id
+      WHERE la.locatario_id = $1 AND la.status = 'ativo' AND la.fim_aluguel > now()
+    `, [jogador_id])
+
+    return res.json([...(proprias||[]), ...(alugadas||[]).map(m => ({ ...m, alugado: true }))])
   }
 
-  // POST — admin adiciona máquina (compra na concessionária futuramente)
+  // POST — admin adiciona máquina
   if (req.method === 'POST') {
     if (user.role !== 'admin') return res.status(403).json({ error: 'Sem permissão' })
     const { jogador_id, tipo, marca, nome } = req.body

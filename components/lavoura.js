@@ -245,9 +245,21 @@ function LavouraAdmin({ api, user, notify, snd }) {
   const [estoqueRacao, setEstRacao]  = useState(0)
   const [cultura,      setCultura]   = useState('milho')
   const [haInput,      setHaInput]   = useState(10)
-  const [sortando,     setSortando]  = useState(null) // id do campo sendo sortado
+  const [sortando,     setSortando]  = useState(null)
   const [loading,      setLoading]   = useState(true)
   const [salvando,     setSalvando]  = useState(false)
+  const [rentPreco,    setRentPreco] = useState({}) // { [id]: valor_digitado }
+  const [savingRent,   setSavingRent]= useState(null)
+
+  async function configurarAluguel(maquinaId, disponivel, preco_dia) {
+    setSavingRent(maquinaId)
+    await api('/api/lavoura/alugueis', {
+      method: 'PATCH',
+      body: JSON.stringify({ action:'configurar', maquina_id: maquinaId, disponivel, preco_dia })
+    })
+    setSavingRent(null)
+    recarregar()
+  }
 
   // ─── Carrega dados da API ──────────────────────────────────────────────────
   async function recarregar() {
@@ -532,33 +544,104 @@ function LavouraAdmin({ api, user, notify, snd }) {
       <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 20px',marginBottom:16,boxShadow:'0 4px 20px rgba(0,0,0,.4)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
           <span style={{fontSize:13,fontWeight:700,color:'var(--ice)',fontFamily:"'Playfair Display',serif"}}>🏚️ Garagem</span>
-          <div style={{display:'flex',gap:12,fontSize:10,fontFamily:'var(--font-data)'}}>
+          <div style={{display:'flex',gap:10,fontSize:10,fontFamily:'var(--font-data)',flexWrap:'wrap'}}>
             <span style={{color:podePlantar?'#4ade80':'#f87171'}}>{podePlantar?'✓ Pode plantar':'✗ Sem trator/plantadeira'}</span>
             <span style={{color:podeColher?'#4ade80':'#f87171'}}>{podeColher?'✓ Pode colher':'✗ Sem colheitadeira'}</span>
           </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:8}}>
+          {/* Slots por tipo — mostra todas as máquinas */}
           {['trator','plantadeira','colheitadeira'].map(tipo=>{
-            const m     = garagem.find(g=>g.tipo===tipo)
-            const cor   = m ? '#4ade80' : 'var(--border2)'
+            const maquinas = garagem.filter(g=>g.tipo===tipo)
             const iconT = {trator:'🚜',plantadeira:'🌱',colheitadeira:'⚙️'}[tipo]
             const labT  = {trator:'Trator',plantadeira:'Plantadeira',colheitadeira:'Colheitadeira'}[tipo]
-            return (
-              <div key={tipo} style={{background:m?'rgba(74,222,128,.04)':'var(--input-bg)',border:`1px solid ${m?'rgba(74,222,128,.2)':'var(--border)'}`,borderTop:`2px solid ${cor}`,borderRadius:7,padding:'12px'}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:m?8:0}}>
-                  <span style={{fontSize:18}}>{iconT}</span>
+
+            if (maquinas.length === 0) return (
+              <div key={tipo} style={{background:'var(--input-bg)',border:'1px solid var(--border)',borderTop:'2px solid var(--border2)',borderRadius:7,padding:'12px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:18,opacity:.4}}>{iconT}</span>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:11,fontWeight:700,color:m?'var(--ice)':'var(--ice3)',fontFamily:'var(--font-data)'}}>{labT}</div>
-                    {m&&<div style={{fontSize:9,color:cor,letterSpacing:1,fontFamily:'var(--font-data)',fontWeight:700}}>{m.marca.toUpperCase()}</div>}
+                    <div style={{fontSize:11,fontWeight:700,color:'var(--ice3)',fontFamily:'var(--font-data)'}}>{labT}</div>
                   </div>
-                  <span style={{fontSize:7,fontWeight:700,letterSpacing:1,background:m?'rgba(74,222,128,.15)':'rgba(248,113,113,.1)',color:m?'#4ade80':'#f87171',border:`1px solid ${m?'rgba(74,222,128,.3)':'rgba(248,113,113,.3)'}`,padding:'2px 5px',borderRadius:3,fontFamily:'var(--font-data)'}}>{m?'OK':'SEM'}</span>
+                  <span style={{fontSize:7,fontWeight:700,letterSpacing:1,background:'rgba(248,113,113,.1)',color:'#f87171',border:'1px solid rgba(248,113,113,.3)',padding:'2px 5px',borderRadius:3,fontFamily:'var(--font-data)'}}>SEM</span>
                 </div>
-                {m&&<div style={{fontSize:10,color:'var(--ice3)',fontFamily:'var(--font-data)'}}>
-                  {m.nome} · <span style={{color:'#4ade80',fontWeight:700}}>{CAP_MARCA[m.marca]} ha/dia</span>
-                </div>}
-                {!m&&<div style={{fontSize:10,color:'var(--ice3)',fontFamily:'var(--font-data)',marginTop:4}}>Compre na <span style={{color:'var(--gold)'}}>Concessionária</span></div>}
+                <div style={{fontSize:10,color:'var(--ice3)',fontFamily:'var(--font-data)',marginTop:6}}>Compre na <span style={{color:'var(--gold)'}}>Concessionária</span></div>
               </div>
             )
+
+            return maquinas.map(m => {
+              const isAlugada    = !!m.alugado // rented from someone else
+              const alugadaPara  = m.alugado_para_nome // being rented to someone (dono view)
+              const alugadaAte   = m.alugado_ate ? new Date(m.alugado_ate) : null
+              const fmtDate      = d => d ? `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}` : ''
+              const cor = '#4ade80'
+              const precoLocal = rentPreco[m.id] !== undefined ? rentPreco[m.id] : (m.preco_aluguel_dia||0)
+              const isSaving = savingRent === m.id
+
+              return (
+                <div key={m.id} style={{background:'rgba(74,222,128,.04)',border:`1px solid rgba(74,222,128,.2)`,borderTop:`2px solid ${isAlugada?'#a78bfa':cor}`,borderRadius:7,padding:'12px'}}>
+                  {/* Header */}
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                    <span style={{fontSize:18}}>{iconT}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:11,fontWeight:700,color:'var(--ice)',fontFamily:'var(--font-data)'}}>{labT}</div>
+                      <div style={{fontSize:9,color:cor,letterSpacing:1,fontFamily:'var(--font-data)',fontWeight:700}}>{m.marca?.toUpperCase()}</div>
+                    </div>
+                    <span style={{fontSize:7,fontWeight:700,letterSpacing:1,background:isAlugada?'rgba(167,139,250,.15)':'rgba(74,222,128,.15)',color:isAlugada?'#a78bfa':cor,border:`1px solid ${isAlugada?'rgba(167,139,250,.3)':'rgba(74,222,128,.3)'}`,padding:'2px 5px',borderRadius:3,fontFamily:'var(--font-data)'}}>
+                      {isAlugada?'ALUG.':'OK'}
+                    </span>
+                  </div>
+
+                  {/* Nome + capacidade */}
+                  <div style={{fontSize:10,color:'var(--ice3)',fontFamily:'var(--font-data)',marginBottom:6}}>
+                    {m.nome} · <span style={{color:'#4ade80',fontWeight:700}}>{CAP_MARCA[m.marca]} ha/dia</span>
+                  </div>
+
+                  {/* Badge: alugada DE alguém */}
+                  {isAlugada && (
+                    <div style={{fontSize:9,background:'rgba(167,139,250,.1)',border:'1px solid rgba(167,139,250,.3)',color:'#a78bfa',borderRadius:4,padding:'3px 7px',fontFamily:'var(--font-data)',marginBottom:6}}>
+                      🔑 de {m.dono_nome} · até {fmtDate(alugadaAte)}
+                    </div>
+                  )}
+
+                  {/* Badge: alugada PARA alguém (dono) */}
+                  {!isAlugada && alugadaPara && (
+                    <div style={{fontSize:9,background:'rgba(250,196,100,.1)',border:'1px solid rgba(250,196,100,.3)',color:'#fac464',borderRadius:4,padding:'3px 7px',fontFamily:'var(--font-data)',marginBottom:6}}>
+                      💰 alugada p/ {alugadaPara} · até {fmtDate(alugadaAte)}
+                    </div>
+                  )}
+
+                  {/* Controle de aluguel (apenas máquinas próprias e sem aluguel ativo) */}
+                  {!isAlugada && !alugadaPara && (
+                    <div style={{borderTop:'1px solid rgba(74,222,128,.1)',paddingTop:8,marginTop:4}}>
+                      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:m.disponivel_aluguel?6:0}}>
+                        <button
+                          onClick={()=>configurarAluguel(m.id, !m.disponivel_aluguel, precoLocal)}
+                          disabled={isSaving}
+                          style={{fontSize:9,padding:'2px 8px',borderRadius:4,border:`1px solid ${m.disponivel_aluguel?'rgba(74,222,128,.5)':'rgba(255,255,255,.15)'}`,background:m.disponivel_aluguel?'rgba(74,222,128,.15)':'rgba(255,255,255,.05)',color:m.disponivel_aluguel?'#4ade80':'var(--ice3)',cursor:'pointer',fontFamily:'var(--font-data)',fontWeight:700,transition:'all .15s'}}
+                        >
+                          {isSaving?'...':m.disponivel_aluguel?'✓ P/ aluguel':'Alugar'}
+                        </button>
+                        <span style={{fontSize:9,color:'var(--ice3)',fontFamily:'var(--font-data)'}}>Disponível</span>
+                      </div>
+                      {m.disponivel_aluguel && (
+                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          <span style={{fontSize:9,color:'var(--ice3)',fontFamily:'var(--font-data)'}}>$</span>
+                          <input
+                            type="number" min="0"
+                            value={precoLocal}
+                            onChange={e=>setRentPreco(p=>({...p,[m.id]:e.target.value}))}
+                            onBlur={()=>configurarAluguel(m.id, true, precoLocal)}
+                            style={{width:60,background:'var(--input-bg)',border:'1px solid var(--border2)',borderRadius:4,padding:'2px 6px',fontSize:10,color:'var(--ice)',fontFamily:'var(--font-data)',outline:'none'}}
+                          />
+                          <span style={{fontSize:9,color:'var(--ice3)',fontFamily:'var(--font-data)'}}>/dia</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })
           })}
         </div>
       </div>

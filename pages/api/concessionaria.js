@@ -114,32 +114,36 @@ export default async function handler(req, res) {
 
   if (!user) return res.status(401).json({ error: 'Não autorizado' })
 
-  // POST — jogador solicita compra de caminhão
+  // POST — jogador solicita compra
   if (req.method === 'POST') {
-    const { modelo_id, comprovante } = req.body
+    const { modelo_id, comprovante, quantidade } = req.body
+    const qty = Math.min(Math.max(parseInt(quantidade)||1, 1), 10)
     const { data: modelo } = await queryOne(`SELECT * FROM concessionaria_estoque WHERE id=$1`, [parseInt(modelo_id)])
     if (!modelo) return res.status(404).json({ error: 'Modelo não encontrado' })
 
-    // Check se tabela pedidos_caminhao existe, se não criar inline
+    // Garante coluna quantidade na tabela
     await query(`CREATE TABLE IF NOT EXISTS pedidos_caminhao (
       id SERIAL PRIMARY KEY,
       jogador_id UUID, jogador_nome TEXT,
       modelo_id INTEGER, modelo_nome TEXT,
       valor NUMERIC(10,2), comprovante TEXT,
+      quantidade INT DEFAULT 1,
       status TEXT DEFAULT 'pendente',
       criado_em TIMESTAMP DEFAULT now()
     )`, [])
+    await query(`ALTER TABLE pedidos_caminhao ADD COLUMN IF NOT EXISTS quantidade INT DEFAULT 1`, [])
 
+    const valorTotal = modelo.preco * qty
     const { data, error } = await queryOne(
-      `INSERT INTO pedidos_caminhao (jogador_id, jogador_nome, modelo_id, modelo_nome, valor, comprovante)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [user.id, user.username, modelo_id, modelo.modelo, modelo.preco, comprovante]
+      `INSERT INTO pedidos_caminhao (jogador_id, jogador_nome, modelo_id, modelo_nome, valor, comprovante, quantidade)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [user.id, user.username, modelo_id, modelo.modelo, valorTotal, comprovante, qty]
     )
     if (error) return res.status(500).json({ error: error.message })
     return res.json(data)
   }
 
-  // PATCH — admin aprova pedido de caminhão
+  // PATCH — admin aprova pedido
   if (req.method === 'PATCH') {
     if (user.role !== 'admin') return res.status(403).json({ error: 'Sem permissão' })
     const { id, status } = req.body
@@ -151,41 +155,45 @@ export default async function handler(req, res) {
 
     if (status === 'aprovado') {
       const { data: modelo } = await queryOne(`SELECT * FROM concessionaria_estoque WHERE id=$1`, [pedido.modelo_id])
+      const qty = pedido.quantidade || 1
 
       if (modelo?.tipo?.startsWith('lavoura_')) {
-        // ── Maquinário de Lavoura → lavoura_garagem ────────────────────────
-        const tipoMaq = modelo.tipo.replace('lavoura_', '') // 'trator','plantadeira','colheitadeira'
-        // Deriva marca do nome do modelo (primeira palavra)
+        // ── Maquinário Lavoura → lavoura_garagem (loop qty) ────────────────
+        const tipoMaq = modelo.tipo.replace('lavoura_', '')
         const marca = pedido.modelo_nome.split(' ')[0] === 'John'
-          ? 'John Deere'
-          : pedido.modelo_nome.split(' ')[0]
-        await queryOne(
-          `INSERT INTO lavoura_garagem (jogador_id, tipo, marca, nome)
-           VALUES ($1,$2,$3,$4) RETURNING *`,
-          [pedido.jogador_id, tipoMaq, marca, pedido.modelo_nome]
-        )
-        await query(
-          `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+          ? 'John Deere' : pedido.modelo_nome.split(' ')[0]
+        for (let i = 0; i < qty; i++) {
+          await queryOne(
+            `INSERT INTO lavoura_garagem (jogador_id, tipo, marca, nome)
+             VALUES ($1,$2,$3,$4) RETURNING id`,
+            [pedido.jogador_id, tipoMaq, marca, pedido.modelo_nome]
+          )
+        }
+        const label = qty > 1 ? `${qty}× ${pedido.modelo_nome}` : pedido.modelo_nome
+        await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
           [pedido.jogador_id, '🚜 Máquina entregue!',
-           `${pedido.modelo_nome} chegou na sua garagem da Lavoura. Pronto para plantar!`]
-        )
+           `${label} chegou na sua garagem da Lavoura. Pronto para plantar!`])
         await query(`INSERT INTO admin_log (admin_nome, acao, detalhes) VALUES ($1,$2,$3)`,
-          [user.username, 'Máquina lavoura entregue', `${pedido.jogador_nome} — ${pedido.modelo_nome}`])
+          [user.username, 'Máquina lavoura entregue', `${pedido.jogador_nome} — ${label}`])
       } else {
-        // ── Caminhão → caminhoes ───────────────────────────────────────────
-        const placa = `GV-${String(Math.floor(Math.random()*9000)+1000)}`
-        await queryOne(
-          `INSERT INTO caminhoes (jogador_id, jogador_nome, modelo, placa, capacidade, racao_cap, tipo, status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel') RETURNING *`,
-          [pedido.jogador_id, pedido.jogador_nome, pedido.modelo_nome, placa, modelo?.capacidade || 60, modelo?.racao_cap || 3000, modelo?.tipo || 'gado']
-        )
-        await query(
-          `INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+        // ── Caminhão → caminhoes (loop qty) ───────────────────────────────
+        const placas = []
+        for (let i = 0; i < qty; i++) {
+          const placa = `GV-${String(Math.floor(Math.random()*9000)+1000)}`
+          placas.push(placa)
+          await queryOne(
+            `INSERT INTO caminhoes (jogador_id, jogador_nome, modelo, placa, capacidade, racao_cap, tipo, status)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,'disponivel') RETURNING id`,
+            [pedido.jogador_id, pedido.jogador_nome, pedido.modelo_nome, placa,
+             modelo?.capacidade||60, modelo?.racao_cap||3000, modelo?.tipo||'gado']
+          )
+        }
+        const label = qty > 1 ? `${qty}× ${pedido.modelo_nome}` : `${pedido.modelo_nome} (${placas[0]})`
+        await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
           [pedido.jogador_id, '🚛 Caminhão entregue!',
-           `Seu ${pedido.modelo_nome} (placa ${placa}) está na sua garagem. Pronto para fazer fretes!`]
-        )
+           `${label} está na sua garagem. Pronto para fazer fretes!`])
         await query(`INSERT INTO admin_log (admin_nome, acao, detalhes) VALUES ($1,$2,$3)`,
-          [user.username, 'Caminhão entregue', `${pedido.jogador_nome} — ${pedido.modelo_nome}`])
+          [user.username, 'Caminhão entregue', `${pedido.jogador_nome} — ${label}`])
       }
     }
 

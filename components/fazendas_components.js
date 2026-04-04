@@ -1631,43 +1631,74 @@ const CONCE_TABS = [
   { v:'tratores',       l:'🚜 Tratores',       fn: m => m.tipo === 'lavoura_trator' },
   { v:'implementos',    l:'🌱 Implementos',    fn: m => m.tipo === 'lavoura_plantadeira' },
   { v:'colheitadeiras', l:'⚙️ Colheitadeiras', fn: m => m.tipo === 'lavoura_colheitadeira' },
+  { v:'alugar',         l:'🤝 Alugar',         fn: null },
 ]
+const CAP_ALUG = { trator:'🚜', plantadeira:'🌱', colheitadeira:'⚙️' }
+const TIPO_LABEL = { trator:'Trator', plantadeira:'Plantadeira', colheitadeira:'Colheitadeira' }
 
 export function ConcessionariaPage({ T, user, api, notify, sounds }) {
-  const [modelos, setModelos] = useState([])
-  const [pedidos, setPedidos] = useState([])
-  const [comprovante, setComprovante] = useState('')
-  const [modeloSel, setModeloSel] = useState(null)
-  const [step, setStep] = useState(1)
-  const [tabCat, setTabCat] = useState('caminhoes')
+  const [modelos,    setModelos]   = useState([])
+  const [pedidos,    setPedidos]   = useState([])
+  const [alugPend,   setAlugPend]  = useState([]) // admin: alugueis pendentes
+  const [dispAlug,   setDispAlug]  = useState([]) // tab alugar: máquinas disponíveis
+  const [comprovante,setComprovante]=useState('')
+  const [modeloSel,  setModeloSel] = useState(null)
+  const [step,       setStep]      = useState(1)   // 1=catálogo 2=form 3=ok
+  const [qty,        setQty]       = useState(1)
+  const [tabCat,     setTabCat]    = useState('caminhoes')
+  // aba alugar
+  const [maqSel,     setMaqSel]    = useState(null) // máquina selecionada p/ alugar
+  const [diasAlug,   setDiasAlug]  = useState(3)
+  const [compAlug,   setCompAlug]  = useState('')
+  const [stepAlug,   setStepAlug]  = useState(1)   // 1=lista 2=form 3=ok
 
   const load = useCallback(async () => {
     const m = await fetch('/api/concessionaria').then(r=>r.json())
     setModelos(Array.isArray(m)?m:[])
     if (user?.role === 'admin') {
-      const p = await api('/api/concessionaria?tipo=pedidos')
+      const [p, a] = await Promise.all([
+        api('/api/concessionaria?tipo=pedidos'),
+        api('/api/lavoura/alugueis?tipo=pendentes'),
+      ])
       setPedidos(Array.isArray(p)?p:[])
+      setAlugPend(Array.isArray(a)?a:[])
     }
   }, [user, api])
 
+  const loadDisponiveis = useCallback(async () => {
+    const d = await api('/api/lavoura/alugueis?tipo=disponiveis')
+    setDispAlug(Array.isArray(d)?d:[])
+  }, [api])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { if (tabCat==='alugar') loadDisponiveis() }, [tabCat, loadDisponiveis])
 
   async function comprarModelo() {
     if (!comprovante) return notify('Cole o comprovante!', 'danger')
     const r = await api('/api/concessionaria', {
       method: 'POST',
-      body: JSON.stringify({ modelo_id: modeloSel.id, comprovante })
+      body: JSON.stringify({ modelo_id: modeloSel.id, comprovante, quantidade: qty })
     })
     if (r.error) return notify('Erro: ' + r.error, 'danger')
-    sounds?.coin()
-    setStep(3); load()
+    sounds?.coin(); setStep(3); load()
+  }
+
+  async function solicitarAluguel() {
+    if (!compAlug) return notify('Cole o comprovante!', 'danger')
+    const r = await api('/api/lavoura/alugueis', {
+      method: 'POST',
+      body: JSON.stringify({ maquina_id: maqSel.id, dias: diasAlug, comprovante: compAlug })
+    })
+    if (r.error) return notify('Erro: ' + r.error, 'danger')
+    sounds?.coin(); setStepAlug(3)
   }
 
   const pedidosPend = pedidos.filter(p => p.status === 'pendente')
-  const tabInfo = CONCE_TABS.find(t => t.v === tabCat) || CONCE_TABS[0]
-  const modelosFiltrados = modelos.filter(tabInfo.fn)
-  const isLavoura = modeloSel?.tipo?.startsWith('lavoura_')
-  const tipoEmoji = isLavoura
+  const totalPend   = pedidosPend.length + alugPend.length
+  const tabInfo     = CONCE_TABS.find(t => t.v === tabCat) || CONCE_TABS[0]
+  const modelosFiltrados = tabInfo.fn ? modelos.filter(tabInfo.fn) : []
+  const isLavoura   = modeloSel?.tipo?.startsWith('lavoura_')
+  const tipoEmoji   = isLavoura
     ? { lavoura_trator:'🚜', lavoura_plantadeira:'🌱', lavoura_colheitadeira:'⚙️' }[modeloSel?.tipo] || '🚜'
     : '🚛'
 
@@ -1679,150 +1710,263 @@ export function ConcessionariaPage({ T, user, api, notify, sounds }) {
           <span style={{ fontSize:22 }}>🏢</span>
           <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize:22, fontWeight:700, color:T.text }}>Concessionária</h1>
         </div>
-        <p style={{ fontSize:12, color:T.textMuted, marginLeft:34 }}>Caminhões, tratores e implementos agrícolas</p>
+        <p style={{ fontSize:12, color:T.textMuted, marginLeft:34 }}>Compre ou alugue caminhões, tratores e implementos</p>
       </div>
 
-      {/* Admin: pedidos pendentes */}
-      {user?.role === 'admin' && pedidosPend.length > 0 && (
+      {/* Admin: pedidos pendentes (compra + aluguel) */}
+      {user?.role === 'admin' && totalPend > 0 && (
         <div style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:16, marginBottom:18 }}>
           <div style={{ fontFamily:"'Playfair Display',serif", fontSize:14, fontWeight:700, color:T.text, marginBottom:12 }}>
-            Pedidos pendentes <Badge type="amber">{pedidosPend.length}</Badge>
+            Pedidos pendentes <Badge type="amber">{totalPend}</Badge>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {pedidosPend.map(p => (
-              <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:T.inputBg, borderRadius:10, border:`1px solid ${T.border2}`, flexWrap:'wrap' }}>
-                <div style={{ flex:1, minWidth:140 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:T.text }}>{p.jogador_nome}</div>
-                  <div style={{ fontSize:11, color:T.textMuted }}>{p.modelo_nome} · ${fmt(p.valor)}</div>
-                  {p.comprovante && <a href={p.comprovante} target="_blank" rel="noreferrer" style={{ fontSize:11, color:'#4a90d0' }}>Ver comprovante →</a>}
-                </div>
-                <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={async()=>{await api('/api/concessionaria',{method:'PATCH',body:JSON.stringify({id:p.id,status:'aprovado'})});sounds?.success();notify('✓ Entregue!');load()}} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>✓ Entregar</button>
-                  <button onClick={async()=>{await api('/api/concessionaria',{method:'PATCH',body:JSON.stringify({id:p.id,status:'recusado'})});notify('Recusado.');load()}} style={{ padding:'6px 10px', background:'#3a0808', color:'#e06060', border:'1px solid #6a1818', borderRadius:8, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>✗</button>
-                </div>
+          {/* Compras */}
+          {pedidosPend.length > 0 && (
+            <>
+              <div style={{ fontSize:10, color:T.textMuted, letterSpacing:1, textTransform:'uppercase', marginBottom:6 }}>Compras</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:7, marginBottom:alugPend.length?14:0 }}>
+                {pedidosPend.map(p => (
+                  <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:T.inputBg, borderRadius:10, border:`1px solid ${T.border2}`, flexWrap:'wrap' }}>
+                    <div style={{ flex:1, minWidth:140 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:T.text }}>{p.jogador_nome}</div>
+                      <div style={{ fontSize:11, color:T.textMuted }}>
+                        {p.quantidade > 1 ? `${p.quantidade}× ` : ''}{p.modelo_nome} · ${fmt(p.valor)}
+                      </div>
+                      {p.comprovante && <a href={p.comprovante} target="_blank" rel="noreferrer" style={{ fontSize:11, color:'#4a90d0' }}>Ver comprovante →</a>}
+                    </div>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={async()=>{await api('/api/concessionaria',{method:'PATCH',body:JSON.stringify({id:p.id,status:'aprovado'})});sounds?.success();notify('✓ Entregue!');load()}} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>✓ Entregar</button>
+                      <button onClick={async()=>{await api('/api/concessionaria',{method:'PATCH',body:JSON.stringify({id:p.id,status:'recusado'})});notify('Recusado.');load()}} style={{ padding:'6px 10px', background:'#3a0808', color:'#e06060', border:'1px solid #6a1818', borderRadius:8, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>✗</button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
+          {/* Alugueis */}
+          {alugPend.length > 0 && (
+            <>
+              <div style={{ fontSize:10, color:T.textMuted, letterSpacing:1, textTransform:'uppercase', marginBottom:6 }}>Aluguéis</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                {alugPend.map(a => (
+                  <div key={a.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:T.inputBg, borderRadius:10, border:'1px solid rgba(167,139,250,.25)', flexWrap:'wrap' }}>
+                    <div style={{ flex:1, minWidth:140 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:T.text }}>{a.locatario_nome}</div>
+                      <div style={{ fontSize:11, color:T.textMuted }}>
+                        {a.maquina_nome} · {a.dias}d · ${fmt(a.valor_total)}
+                        <span style={{ color:'#9a80d0', marginLeft:6 }}>de {a.dono_nome}</span>
+                      </div>
+                      {a.comprovante && <a href={a.comprovante} target="_blank" rel="noreferrer" style={{ fontSize:11, color:'#4a90d0' }}>Ver comprovante →</a>}
+                    </div>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={async()=>{await api('/api/lavoura/alugueis',{method:'PATCH',body:JSON.stringify({action:'aprovar',id:a.id})});sounds?.success();notify('✓ Aluguel aprovado!');load()}} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#206040,#40a060)', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>✓ Aprovar</button>
+                      <button onClick={async()=>{await api('/api/lavoura/alugueis',{method:'PATCH',body:JSON.stringify({action:'recusar',id:a.id})});notify('Recusado.');load()}} style={{ padding:'6px 10px', background:'#3a0808', color:'#e06060', border:'1px solid #6a1818', borderRadius:8, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>✗</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* Step 3: confirmação */}
+      {/* Step 3: confirmação compra */}
       {step === 3 ? (
         <div style={{ background:T.card, border:`1px solid ${T.border2}`, borderRadius:14, padding:40, textAlign:'center', maxWidth:440, margin:'0 auto' }}>
           <div style={{ fontSize:52, marginBottom:14 }}>{tipoEmoji}</div>
           <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:20, color:'#a080ff', marginBottom:8 }}>Pedido enviado!</h2>
           <p style={{ fontSize:13, color:T.textMuted, lineHeight:1.8, marginBottom:18 }}>O admin irá verificar seu comprovante e entregar na sua garagem.</p>
-          <button onClick={()=>{setStep(1);setModeloSel(null);setComprovante('')}} style={{ padding:'9px 20px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Ver outro modelo</button>
+          <button onClick={()=>{setStep(1);setModeloSel(null);setComprovante('');setQty(1)}} style={{ padding:'9px 20px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Ver outro modelo</button>
         </div>
 
-      /* Step 2: comprar */
+      /* Step 2: form compra */
       ) : step === 2 && modeloSel ? (
         <div style={{ maxWidth:460, margin:'0 auto' }}>
-          <div style={{ background:T.card, border:'1px solid #3020a0', borderRadius:14, padding:22, marginBottom:14 }}>
-            <div style={{ display:'flex', gap:14, alignItems:'center', marginBottom:14 }}>
+          <div style={{ background:T.card, border:'1px solid #3020a0', borderRadius:14, padding:22 }}>
+            {/* Preview */}
+            <div style={{ display:'flex', gap:14, alignItems:'center', marginBottom:16 }}>
               <span style={{ fontSize:36 }}>{tipoEmoji}</span>
               <div>
                 <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:T.text }}>{modeloSel.modelo}</div>
                 <div style={{ fontSize:12, color:T.textMuted }}>
-                  {isLavoura ? `${modeloSel.capacidade} ha/dia` : `${modeloSel.capacidade} cabeças máx`} · ${fmt(modeloSel.preco)}
+                  {isLavoura ? `${modeloSel.capacidade} ha/dia` : `${modeloSel.capacidade} cab.`} · ${fmt(modeloSel.preco)} / unid.
                 </div>
               </div>
             </div>
+            {/* Quantidade */}
             <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:7 }}>Quantidade</label>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <button onClick={()=>setQty(q=>Math.max(1,q-1))} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${T.border2}`, background:T.inputBg, color:T.text, fontSize:18, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+                <span style={{ fontSize:20, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif", minWidth:24, textAlign:'center' }}>{qty}</span>
+                <button onClick={()=>setQty(q=>Math.min(10,q+1))} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${T.border2}`, background:T.inputBg, color:T.text, fontSize:18, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                <span style={{ fontSize:12, color:T.textMuted, marginLeft:4 }}>= <strong style={{ color:T.text }}>${fmt(modeloSel.preco * qty)}</strong></span>
+              </div>
+            </div>
+            {/* Comprovante */}
+            <div style={{ marginBottom:16 }}>
               <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:7 }}>Link do comprovante (Discord)</label>
               <input value={comprovante} onChange={e=>setComprovante(e.target.value)} placeholder="https://discord.com/channels/..." style={{ width:'100%', boxSizing:'border-box', background:T.inputBg, border:`1px solid ${T.border2}`, borderRadius:10, padding:'10px 14px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
             </div>
             <div style={{ display:'flex', gap:10 }}>
-              <button onClick={()=>setStep(1)} style={{ flex:1, padding:10, background:'transparent', border:`1px solid ${T.border2}`, color:T.textDim, borderRadius:10, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Voltar</button>
-              <button onClick={comprarModelo} style={{ flex:2, padding:10, background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar — ${fmt(modeloSel.preco)}</button>
+              <button onClick={()=>{setStep(1);setQty(1)}} style={{ flex:1, padding:10, background:'transparent', border:`1px solid ${T.border2}`, color:T.textDim, borderRadius:10, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Voltar</button>
+              <button onClick={comprarModelo} style={{ flex:2, padding:10, background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                Comprar{qty>1?` ${qty}×`:''} — ${fmt(modeloSel.preco * qty)}
+              </button>
             </div>
           </div>
         </div>
 
-      /* Step 1: catálogo */
+      /* Catálogo / Alugar */
       ) : (
         <>
           {/* Tabs — scrollável no mobile */}
           <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch', marginBottom:18, paddingBottom:4 }}>
             <div style={{ display:'flex', gap:8, minWidth:'max-content' }}>
               {CONCE_TABS.map(t => {
-                const cnt = modelos.filter(t.fn).length
+                const cnt = t.fn ? modelos.filter(t.fn).length : dispAlug.length
                 const ativo = tabCat === t.v
+                const isAlug = t.v === 'alugar'
                 return (
-                  <button key={t.v} onClick={()=>setTabCat(t.v)} style={{
+                  <button key={t.v} onClick={()=>{setTabCat(t.v);setStepAlug(1);setMaqSel(null)}} style={{
                     padding:'8px 16px', borderRadius:22,
-                    border:`1px solid ${ativo ? '#5030c0' : T.border}`,
-                    background: ativo ? 'rgba(80,48,192,.22)' : 'transparent',
-                    color: ativo ? '#a080ff' : T.textMuted,
+                    border:`1px solid ${ativo?(isAlug?'#2a6040':' #5030c0'):T.border}`,
+                    background: ativo?(isAlug?'rgba(40,96,64,.22)':'rgba(80,48,192,.22)'):'transparent',
+                    color: ativo?(isAlug?'#4ad4a0':'#a080ff'):T.textMuted,
                     fontSize:13, cursor:'pointer', fontFamily:'inherit',
-                    fontWeight: ativo ? 700 : 400,
-                    whiteSpace:'nowrap', transition:'all .15s',
+                    fontWeight: ativo?700:400, whiteSpace:'nowrap', transition:'all .15s',
                     display:'flex', alignItems:'center', gap:6,
                   }}>
                     {t.l}
-                    <span style={{ background: ativo?'rgba(160,128,255,.25)':T.inputBg, color: ativo?'#a080ff':T.textMuted, fontSize:11, fontWeight:700, borderRadius:10, padding:'1px 7px', border:`1px solid ${ativo?'#5030c0':T.border}` }}>{cnt}</span>
+                    {cnt > 0 && <span style={{ background: ativo?(isAlug?'rgba(74,212,160,.2)':'rgba(160,128,255,.25)'):T.inputBg, color: ativo?(isAlug?'#4ad4a0':'#a080ff'):T.textMuted, fontSize:11, fontWeight:700, borderRadius:10, padding:'1px 7px', border:`1px solid ${ativo?(isAlug?'#2a6040':'#5030c0'):T.border}` }}>{cnt}</span>}
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Grid de modelos */}
-          {modelosFiltrados.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontSize:13 }}>Nenhum modelo disponível nesta categoria.</div>
-          ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:14 }}>
-              {modelosFiltrados.map(m => {
-                const isLav = m.tipo?.startsWith('lavoura_')
-                return (
-                  <div key={m.id} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, overflow:'hidden', transition:'all .22s', cursor:'pointer' }}
-                    onMouseEnter={e=>{e.currentTarget.style.border='1px solid #5030c0';e.currentTarget.style.transform='translateY(-3px)'}}
-                    onMouseLeave={e=>{e.currentTarget.style.border=`1px solid ${T.border}`;e.currentTarget.style.transform='translateY(0)'}}>
-                    {/* Foto */}
-                    <div style={{ height:150, overflow:'hidden', background:'#0a0a0a', position:'relative' }}>
-                      <img src={m.foto_url} alt={m.modelo} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.75)' }} onError={e=>e.target.style.display='none'}/>
-                      <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.7),transparent 50%)' }}/>
-                      <div style={{ position:'absolute', bottom:9, left:12 }}>
-                        {isLav ? (
-                          <span style={{ background:'rgba(10,24,8,.9)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
-                            🌿 {m.capacidade} ha/dia
-                          </span>
-                        ) : (
-                          <span style={{ background:'rgba(10,8,24,.9)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>
-                            🐄 {m.capacidade > 0 ? `${m.capacidade} cab.` : 'Somente ração'}
-                          </span>
-                        )}
+          {/* ── Aba: Compra ── */}
+          {tabCat !== 'alugar' && (
+            modelosFiltrados.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontSize:13 }}>Nenhum modelo disponível.</div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:14 }}>
+                {modelosFiltrados.map(m => {
+                  const isLav = m.tipo?.startsWith('lavoura_')
+                  return (
+                    <div key={m.id} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:16, overflow:'hidden', transition:'all .22s', cursor:'pointer' }}
+                      onMouseEnter={e=>{e.currentTarget.style.border='1px solid #5030c0';e.currentTarget.style.transform='translateY(-3px)'}}
+                      onMouseLeave={e=>{e.currentTarget.style.border=`1px solid ${T.border}`;e.currentTarget.style.transform='translateY(0)'}}>
+                      <div style={{ height:150, overflow:'hidden', background:'#0a0a0a', position:'relative' }}>
+                        <img src={m.foto_url} alt={m.modelo} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(.75)' }} onError={e=>e.target.style.display='none'}/>
+                        <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top,rgba(0,0,0,.7),transparent 50%)' }}/>
+                        <div style={{ position:'absolute', bottom:9, left:12 }}>
+                          {isLav
+                            ? <span style={{ background:'rgba(10,24,8,.9)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>🌿 {m.capacidade} ha/dia</span>
+                            : <span style={{ background:'rgba(10,8,24,.9)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'3px 10px', borderRadius:10, fontWeight:600 }}>🐄 {m.capacidade>0?`${m.capacidade} cab.`:'Ração'}</span>
+                          }
+                        </div>
+                      </div>
+                      <div style={{ padding:'14px 16px' }}>
+                        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700, color:T.text, marginBottom:3 }}>{m.modelo}</div>
+                        <div style={{ fontSize:12, color:T.textMuted, marginBottom:8, lineHeight:1.6 }}>{m.descricao}</div>
+                        <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
+                          {isLav ? (
+                            <>
+                              <span style={{ background:'rgba(42,90,18,.15)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌿 {m.capacidade} ha/dia</span>
+                              <span style={{ background:'rgba(60,40,10,.2)', border:'1px solid #6a4010', color:'#c28c46', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>{{lavoura_trator:'🚜 Trator',lavoura_plantadeira:'🌱 Plantadeira',lavoura_colheitadeira:'⚙️ Colheitadeira'}[m.tipo]||m.tipo}</span>
+                            </>
+                          ) : (
+                            <>
+                              {m.capacidade>0 && <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🐄 {m.capacidade} cab.</span>}
+                              {(m.racao_cap||0)>0 && <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border2}`, color:T.gold||'#c8922a', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌾 {fmt(m.racao_cap)}kg</span>}
+                            </>
+                          )}
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                          <div style={{ fontSize:20, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(m.preco)}</div>
+                          <button onClick={()=>{setModeloSel(m);setQty(1);setStep(2)}} style={{ padding:'8px 16px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar</button>
+                        </div>
                       </div>
                     </div>
-                    {/* Info */}
-                    <div style={{ padding:'14px 16px' }}>
-                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700, color:T.text, marginBottom:3 }}>{m.modelo}</div>
-                      <div style={{ fontSize:12, color:T.textMuted, marginBottom:8, lineHeight:1.6 }}>{m.descricao}</div>
-                      <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
-                        {isLav ? (
-                          <>
-                            <span style={{ background:'rgba(42,90,18,.15)', border:'1px solid #2a5a12', color:'#4ade80', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌿 {m.capacidade} ha/dia</span>
-                            <span style={{ background:'rgba(60,40,10,.2)', border:'1px solid #6a4010', color:'#c28c46', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>
-                              {{lavoura_trator:'🚜 Trator', lavoura_plantadeira:'🌱 Plantadeira', lavoura_colheitadeira:'⚙️ Colheitadeira'}[m.tipo] || m.tipo}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            {m.capacidade > 0 && <span style={{ background:'rgba(80,48,192,.1)', border:'1px solid #3020a0', color:'#a080ff', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🐄 {m.capacidade} cab.</span>}
-                            {(m.racao_cap||0) > 0 && <span style={{ background:'rgba(200,146,42,.1)', border:`1px solid ${T.border2}`, color:T.gold||'#c8922a', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>🌾 {fmt(m.racao_cap)}kg ração</span>}
-                            {m.tipo==='racao' && <span style={{ background:'rgba(100,160,80,.1)', border:'1px solid #4a8a30', color:'#6ab840', fontSize:11, padding:'2px 8px', borderRadius:8, fontWeight:600 }}>Somente ração</span>}
-                          </>
-                        )}
-                      </div>
-                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                        <div style={{ fontSize:20, fontWeight:800, color:'#a080ff', fontFamily:"'Playfair Display',serif" }}>${fmt(m.preco)}</div>
-                        <button onClick={()=>{setModeloSel(m);setStep(2)}} style={{ padding:'8px 16px', background:'linear-gradient(135deg,#3020a0,#6030c0)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Comprar</button>
-                      </div>
+                  )
+                })}
+              </div>
+            )
+          )}
+
+          {/* ── Aba: Alugar ── */}
+          {tabCat === 'alugar' && (
+            stepAlug === 3 ? (
+              <div style={{ background:T.card, border:'1px solid rgba(74,212,160,.25)', borderRadius:14, padding:40, textAlign:'center', maxWidth:440, margin:'0 auto' }}>
+                <div style={{ fontSize:52, marginBottom:14 }}>🤝</div>
+                <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:20, color:'#4ad4a0', marginBottom:8 }}>Pedido enviado!</h2>
+                <p style={{ fontSize:13, color:T.textMuted, lineHeight:1.8, marginBottom:18 }}>O admin irá verificar o comprovante e liberar a máquina na sua garagem.</p>
+                <button onClick={()=>{setStepAlug(1);setMaqSel(null);setCompAlug('');loadDisponiveis()}} style={{ padding:'9px 20px', background:'linear-gradient(135deg,#206040,#40a060)', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Ver outras</button>
+              </div>
+
+            ) : stepAlug === 2 && maqSel ? (
+              <div style={{ maxWidth:460, margin:'0 auto' }}>
+                <div style={{ background:T.card, border:'1px solid rgba(74,212,160,.3)', borderRadius:14, padding:22 }}>
+                  <div style={{ display:'flex', gap:14, alignItems:'center', marginBottom:16 }}>
+                    <span style={{ fontSize:36 }}>{CAP_ALUG[maqSel.tipo]||'🚜'}</span>
+                    <div>
+                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:17, fontWeight:700, color:T.text }}>{maqSel.nome}</div>
+                      <div style={{ fontSize:12, color:T.textMuted }}>{maqSel.marca} · dono: {maqSel.dono_nome}</div>
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                  {/* Dias */}
+                  <div style={{ marginBottom:14 }}>
+                    <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:7 }}>Dias de aluguel</label>
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <button onClick={()=>setDiasAlug(d=>Math.max(1,d-1))} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${T.border2}`, background:T.inputBg, color:T.text, fontSize:18, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+                      <span style={{ fontSize:20, fontWeight:800, color:'#4ad4a0', fontFamily:"'Playfair Display',serif", minWidth:24, textAlign:'center' }}>{diasAlug}</span>
+                      <button onClick={()=>setDiasAlug(d=>Math.min(30,d+1))} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${T.border2}`, background:T.inputBg, color:T.text, fontSize:18, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                      <span style={{ fontSize:12, color:T.textMuted, marginLeft:4 }}>= <strong style={{ color:'#4ad4a0' }}>${fmt((maqSel.preco_aluguel_dia||0) * diasAlug)}</strong></span>
+                    </div>
+                    <div style={{ fontSize:11, color:T.textMuted, marginTop:5 }}>${fmt(maqSel.preco_aluguel_dia||0)}/dia</div>
+                  </div>
+                  {/* Comprovante */}
+                  <div style={{ marginBottom:16 }}>
+                    <label style={{ fontSize:11, color:T.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:'.6px', display:'block', marginBottom:7 }}>Link do comprovante (Discord)</label>
+                    <input value={compAlug} onChange={e=>setCompAlug(e.target.value)} placeholder="https://discord.com/channels/..." style={{ width:'100%', boxSizing:'border-box', background:T.inputBg, border:`1px solid ${T.border2}`, borderRadius:10, padding:'10px 14px', fontSize:13, color:T.text, fontFamily:'inherit', outline:'none' }}/>
+                  </div>
+                  <div style={{ display:'flex', gap:10 }}>
+                    <button onClick={()=>setStepAlug(1)} style={{ flex:1, padding:10, background:'transparent', border:`1px solid ${T.border2}`, color:T.textDim, borderRadius:10, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Voltar</button>
+                    <button onClick={solicitarAluguel} style={{ flex:2, padding:10, background:'linear-gradient(135deg,#206040,#40a060)', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                      Alugar por {diasAlug}d — ${fmt((maqSel.preco_aluguel_dia||0)*diasAlug)}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            ) : dispAlug.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'48px 0' }}>
+                <div style={{ fontSize:40, marginBottom:12 }}>🤝</div>
+                <div style={{ fontSize:14, color:T.textMuted, marginBottom:6 }}>Nenhuma máquina disponível para aluguel no momento.</div>
+                <div style={{ fontSize:12, color:T.textMuted }}>Dono de máquinas pode ativá-las na aba <strong style={{ color:T.text }}>Lavoura → Garagem</strong>.</div>
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12 }}>
+                {dispAlug.map(m => (
+                  <div key={m.id} style={{ background:T.card, border:'1px solid rgba(74,212,160,.2)', borderRadius:14, padding:18, cursor:'pointer', transition:'all .2s' }}
+                    onMouseEnter={e=>{e.currentTarget.style.border='1px solid rgba(74,212,160,.5)';e.currentTarget.style.transform='translateY(-2px)'}}
+                    onMouseLeave={e=>{e.currentTarget.style.border='1px solid rgba(74,212,160,.2)';e.currentTarget.style.transform='translateY(0)'}}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                      <span style={{ fontSize:28 }}>{CAP_ALUG[m.tipo]||'🚜'}</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:14, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>{m.nome}</div>
+                        <div style={{ fontSize:11, color:T.textMuted }}>{m.marca} · {TIPO_LABEL[m.tipo]||m.tipo}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize:11, color:'#9a80d0', marginBottom:10 }}>👤 {m.dono_nome}</div>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                      <div style={{ fontSize:18, fontWeight:800, color:'#4ad4a0', fontFamily:"'Playfair Display',serif" }}>${fmt(m.preco_aluguel_dia)}<span style={{ fontSize:11, color:T.textMuted, fontWeight:400 }}>/dia</span></div>
+                      <button onClick={()=>{setMaqSel(m);setDiasAlug(3);setStepAlug(2)}} style={{ padding:'7px 14px', background:'linear-gradient(135deg,#206040,#40a060)', color:'#fff', border:'none', borderRadius:9, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Alugar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </>
       )}
