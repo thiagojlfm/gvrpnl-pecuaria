@@ -71,6 +71,48 @@ export default async function handler(req, res) {
       // Get jogador info
       const { data: jogador } = await queryOne(`SELECT * FROM usuarios WHERE id = $1`, [solic.jogador_id])
 
+      // ── Auto-distribuição de fazenda ──────────────────────────────────────
+      const CAP_SOL = { bezerro: 3, garrote: 2, boi: 1, abatido: 1 }
+      const necessarioHa = solic.quantidade / 3 // bezerros ocupam 3/ha
+
+      const { data: fazsJogador } = await query(
+        `SELECT * FROM fazendas WHERE dono_id = $1 ORDER BY tamanho_ha DESC`, [solic.jogador_id]
+      )
+
+      // Ordena: fazenda solicitada primeiro, depois por tamanho desc
+      const candidatas = [...(fazsJogador||[])]
+      if (solic.fazenda_id) {
+        const idx = candidatas.findIndex(f => String(f.id) === String(solic.fazenda_id))
+        if (idx > 0) { const [fav] = candidatas.splice(idx, 1); candidatas.unshift(fav) }
+      }
+
+      let fazEscolhida = null
+      for (const faz of candidatas) {
+        const { data: lAtivos } = await query(
+          `SELECT fase, quantidade FROM lotes WHERE fazenda_id = $1 AND status NOT IN ('pago','vendido')`, [faz.id]
+        )
+        const haUsada = (lAtivos||[]).reduce((s,l) => s + l.quantidade / (CAP_SOL[l.fase]||1), 0)
+        if (haUsada + necessarioHa <= faz.tamanho_ha) { fazEscolhida = faz; break }
+      }
+
+      const semEspaco    = !fazEscolhida
+      const redirecionado = fazEscolhida && String(fazEscolhida.id) !== String(solic.fazenda_id)
+      const fazendaIdFinal = fazEscolhida?.id || solic.fazenda_id || candidatas[0]?.id || null
+      const fazendaNomeFinal = fazEscolhida?.nome || candidatas[0]?.nome || ''
+
+      if (semEspaco) {
+        // Notifica jogador: todas as fazendas cheias
+        await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+          [solic.jogador_id, '⚠️ Fazendas no limite de capacidade!',
+           `Seus bezerros estão chegando mas todas as fazendas estão no limite. Venda animais ou alugue pasto extra para acomodar o rebanho.`])
+      } else if (redirecionado) {
+        // Notifica jogador: redirecionado para outra fazenda
+        await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
+          [solic.jogador_id, '🔀 Rebanho redirecionado',
+           `A fazenda solicitada estava cheia. Seus bezerros foram direcionados para ${fazendaNomeFinal} automaticamente.`])
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       // Generate unique codigo using MAX id
       const { data: maxData } = await query("SELECT COALESCE(MAX(CAST(SUBSTRING(codigo FROM 3) AS INTEGER)),0) as mx FROM lotes WHERE codigo ~ '^L-[0-9]+'", [])
       const nextNum = (parseInt(maxData?.[0]?.mx || 0)) + 1
@@ -88,7 +130,7 @@ export default async function handler(req, res) {
           valor_compra, data_compra, data_fase2, data_fase3, data_fase4, status, comprovante)
          VALUES ($1,$2,$3,$4,$5,$6,'bezerro',180,$7,$8,$9,$10,$11,'ativo',$12) RETURNING *`,
         [codigo, solic.jogador_id, solic.jogador_nome || jogador?.username,
-         jogador?.fazenda || '', solic.fazenda_id || null,
+         fazendaNomeFinal || jogador?.fazenda || '', fazendaIdFinal,
          solic.quantidade, solic.quantidade > 0 ? (solic.valor_total / solic.quantidade) : 800,
          hoje.toISOString().split('T')[0],
          fase2.toISOString().split('T')[0],
@@ -123,12 +165,12 @@ export default async function handler(req, res) {
       )
 
       // Frete interno — 30min saindo da transportadora + 30min indo à fazenda = 1h
-      const buscaEm = new Date(Date.now() + 30 * 60 * 1000)  // chega ao curral
-      const chegaEm = new Date(Date.now() + 60 * 60 * 1000)  // chega na fazenda
+      const buscaEm = new Date(Date.now() + 30 * 60 * 1000)
+      const chegaEm = new Date(Date.now() + 60 * 60 * 1000)
       await query(
         `INSERT INTO frete (lote_id, jogador_id, fazenda_id, status, chega_em, busca_em)
          VALUES ($1,$2,$3,'em_rota_buscar',$4,$5)`,
-        [lote.id, solic.jogador_id, solic.fazenda_id || null, chegaEm.toISOString(), buscaEm.toISOString()]
+        [lote.id, solic.jogador_id, fazendaIdFinal || null, chegaEm.toISOString(), buscaEm.toISOString()]
       )
 
       // Marcar lote como em_transito até frete chegar
@@ -138,7 +180,7 @@ export default async function handler(req, res) {
       const valorPorCab = 30
       const BLOCO = 30
       const origemFrete = 'Curral Gov. NPC'
-      const destinoFrete = solic.fazenda_id ? `Fazenda ${jogador?.fazenda || solic.jogador_nome}` : `Fazenda de ${solic.jogador_nome}`
+      const destinoFrete = fazendaNomeFinal ? `Fazenda ${fazendaNomeFinal}` : `Fazenda de ${solic.jogador_nome}`
       let qtdRestante = solic.quantidade
       let numFretes = 0
       let blocoNum = 1

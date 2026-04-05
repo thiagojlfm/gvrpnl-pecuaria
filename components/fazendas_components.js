@@ -627,26 +627,28 @@ function AgendaRebanho({ lotes, T }) {
 }
 
 // ─── Minha Fazenda Page ───────────────────────────────────────────────────────
-export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado, racao }) {
-  const [fazendas, setFazendas] = useState([])
-  const [selectedFaz, setSelectedFaz] = useState(null) // usada só para Serviços
-  const [fretes, setFretes] = useState([])
-  const [custos, setCustos] = useState([])
-  const [novoCusto, setNovoCusto] = useState({ tipo:'cerca', descricao:'', valor:'', prestador_nome:'' })
-  const [loading, setLoading] = useState(true)
+export function MinhaFazendaPage({ T, user, api, notify, lotes: lotesProp, mercado, racao }) {
+  const [fazendas,   setFazendas]   = useState([])
+  const [selectedFaz,setSelectedFaz]= useState(null)
+  const [fretes,     setFretes]     = useState([])
+  const [custos,     setCustos]     = useState([])
+  const [lotesLocal, setLotesLocal] = useState(null) // null = ainda não carregou
+  const [novoCusto, setNovoCusto]   = useState({ tipo:'cerca', descricao:'', valor:'', prestador_nome:'' })
+  const [loading, setLoading]       = useState(true)
 
   const loadAll = useCallback(async () => {
     if (!user) return
     const token = localStorage.getItem('gvrpnl_token')
     const h = token ? { Authorization: `Bearer ${token}` } : {}
-    const [fRes, frRes] = await Promise.all([
+    const [fRes, frRes, lotesRes] = await Promise.all([
       fetch('/api/fazendas?minha=1', { headers: h }).then(r => r.json()),
       fetch(`/api/frete?jogador_id=${user.id}`, { headers: h }).then(r => r.json()).catch(()=>[]),
+      fetch('/api/lotes', { headers: h }).then(r => r.json()).catch(()=>[]),
     ])
     const f = fRes || []
     setFazendas(f)
     setFretes(frRes || [])
-    // Seleciona a primeira fazenda real (não pasto fake) para o painel de Serviços
+    if (Array.isArray(lotesRes)) setLotesLocal(lotesRes)
     if (!selectedFaz) {
       const real = f.find(fz => !String(fz.id).startsWith('pasto_')) || f[0]
       if (real) setSelectedFaz(real)
@@ -662,7 +664,8 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado, racao }
   }, [selectedFaz, api])
 
   // ── TODOS os lotes ativos do jogador (independente de qual fazenda) ──
-  const minhasLotes = (lotes||[]).filter(l => l.status === 'ativo')
+  // Prefere lotesLocal (fetch próprio) → fallback para prop do pai
+  const minhasLotes = (lotesLocal ?? lotesProp ?? []).filter(l => l.status === 'ativo')
 
   // Mapa: fazenda_id real → objeto fazenda (exclui pasto_ fakes pois têm IDs fake)
   const fazMap = new Map(
@@ -795,11 +798,16 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes, mercado, racao }
               {/* Cabeçalho de texto (quando não tem foto hero) */}
               {!fazenda?.foto_url && (
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, paddingBottom:12, borderBottom:`1px solid ${T.border}` }}>
-                  <span style={{ fontSize:22 }}>{isPasto ? '🌿' : '🏡'}</span>
+                  <span style={{ fontSize:22 }}>{fazId==='sem_fazenda' ? '⚠️' : isPasto ? '🌿' : '🏡'}</span>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:15, fontWeight:700, color:T.text, fontFamily:"'Playfair Display',serif" }}>{nomeFaz}</div>
+                    <div style={{ fontSize:15, fontWeight:700, color: fazId==='sem_fazenda'?'#f87171':T.text, fontFamily:"'Playfair Display',serif" }}>{nomeFaz}</div>
                     <div style={{ fontSize:11, color:T.textMuted }}>
-                      {fazenda ? `${fazenda.codigo} · ${fazenda.regiao} · ${fazenda.tamanho_ha} ha` : 'Gado vinculado a este local'}
+                      {fazenda
+                        ? `${fazenda.codigo} · ${fazenda.regiao} · ${fazenda.tamanho_ha} ha`
+                        : fazId==='sem_fazenda'
+                          ? 'Esses lotes não têm fazenda associada — fale com o admin para corrigir'
+                          : 'Gado vinculado a este local'
+                      }
                     </div>
                   </div>
                   {gCap?.lotada && (
