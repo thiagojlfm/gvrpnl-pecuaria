@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   // GET — consulta estoque de ração
   if (req.method === 'GET') {
     const { data } = await queryOne(
-      `SELECT * FROM lavoura_estoque_racao WHERE jogador_id = $1`, [user.id]
+      `SELECT * FROM estoque_racao WHERE jogador_id = $1`, [user.id]
     )
     return res.json(data || { jogador_id: user.id, kg_disponivel: 0 })
   }
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
 
     if (action === 'vender_celeiro') {
       const { data: estoque } = await queryOne(
-        `SELECT kg_disponivel FROM lavoura_estoque_racao WHERE jogador_id = $1`, [user.id]
+        `SELECT kg_disponivel FROM estoque_racao WHERE jogador_id = $1`, [user.id]
       )
       const kgDisponivel = parseFloat(estoque?.kg_disponivel || 0)
       const kgVender     = kg ? Math.min(parseFloat(kg), kgDisponivel) : kgDisponivel
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
       // Zera ou reduz estoque
       await query(
-        `UPDATE lavoura_estoque_racao
+        `UPDATE estoque_racao
          SET kg_disponivel = kg_disponivel - $1, atualizado_em = now()
          WHERE jogador_id = $2`,
         [kgVender, user.id]

@@ -1,14 +1,21 @@
 import { query, queryOne } from '../../../lib/db'
 import { verifyToken, getTokenFromReq } from '../../../lib/auth'
+import { ensureLavouraTables } from '../../../lib/lavoura_schema'
+
+const CAP_MARCA = { Valtra: 30, 'John Deere': 70, Fendt: 150 }
 
 export default async function handler(req, res) {
+  await ensureLavouraTables()
+
   const token = getTokenFromReq(req)
   const user  = token ? verifyToken(token) : null
   if (!user) return res.status(401).json({ error: 'Não autorizado' })
 
   // GET — lista garagem do jogador (próprias + alugadas ativas)
   if (req.method === 'GET') {
-    const jogador_id = req.query.jogador_id || user.id
+    const jogador_id = (req.query.jogador_id && user.role === 'admin')
+      ? req.query.jogador_id
+      : user.id
 
     // Máquinas próprias (com info de aluguel ativo, se houver)
     const { data: proprias } = await query(`
@@ -40,13 +47,14 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     if (user.role !== 'admin') return res.status(403).json({ error: 'Sem permissão' })
     const { jogador_id, tipo, marca, nome } = req.body
+    const capacidade = CAP_MARCA[marca] || null
     if (!jogador_id || !tipo || !marca || !nome)
       return res.status(400).json({ error: 'jogador_id, tipo, marca e nome são obrigatórios' })
 
     const { data, error } = await queryOne(
-      `INSERT INTO lavoura_garagem (jogador_id, tipo, marca, nome)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [jogador_id, tipo, marca, nome]
+      `INSERT INTO lavoura_garagem (jogador_id, tipo, marca, nome, capacidade)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [jogador_id, tipo, marca, nome, capacidade]
     )
     if (error) return res.status(500).json({ error: error.message })
     await query(

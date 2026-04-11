@@ -1,5 +1,6 @@
 import { query, queryOne } from '../../lib/db'
 import { verifyToken, getTokenFromReq } from '../../lib/auth'
+import { ensureLavouraTables } from '../../lib/lavoura_schema'
 
 // Seed de modelos padrão — caminhões
 const MODELOS_PADRAO = [
@@ -71,6 +72,19 @@ const MAQUINAS_LAVOURA = [
   },
 ]
 
+async function ensurePedidosTable() {
+  await query(`CREATE TABLE IF NOT EXISTS pedidos_caminhao (
+    id SERIAL PRIMARY KEY,
+    jogador_id UUID, jogador_nome TEXT,
+    modelo_id INTEGER, modelo_nome TEXT,
+    valor NUMERIC(10,2), comprovante TEXT,
+    quantidade INT DEFAULT 1,
+    status TEXT DEFAULT 'pendente',
+    criado_em TIMESTAMP DEFAULT now()
+  )`, [])
+  await query(`ALTER TABLE pedidos_caminhao ADD COLUMN IF NOT EXISTS quantidade INT DEFAULT 1`, [])
+}
+
 export default async function handler(req, res) {
   const token = getTokenFromReq(req)
   const user = token ? verifyToken(token) : null
@@ -102,6 +116,7 @@ export default async function handler(req, res) {
     }
 
     if (tipo === 'pedidos' && user?.role === 'admin') {
+      await ensurePedidosTable()
       const { data } = await query(
         `SELECT * FROM pedidos_caminhao ORDER BY criado_em DESC`, []
       )
@@ -121,17 +136,7 @@ export default async function handler(req, res) {
     const { data: modelo } = await queryOne(`SELECT * FROM concessionaria_estoque WHERE id=$1`, [parseInt(modelo_id)])
     if (!modelo) return res.status(404).json({ error: 'Modelo não encontrado' })
 
-    // Garante coluna quantidade na tabela
-    await query(`CREATE TABLE IF NOT EXISTS pedidos_caminhao (
-      id SERIAL PRIMARY KEY,
-      jogador_id UUID, jogador_nome TEXT,
-      modelo_id INTEGER, modelo_nome TEXT,
-      valor NUMERIC(10,2), comprovante TEXT,
-      quantidade INT DEFAULT 1,
-      status TEXT DEFAULT 'pendente',
-      criado_em TIMESTAMP DEFAULT now()
-    )`, [])
-    await query(`ALTER TABLE pedidos_caminhao ADD COLUMN IF NOT EXISTS quantidade INT DEFAULT 1`, [])
+    await ensurePedidosTable()
 
     const valorTotal = modelo.preco * qty
     const { data, error } = await queryOne(
@@ -158,15 +163,16 @@ export default async function handler(req, res) {
       const qty = pedido.quantidade || 1
 
       if (modelo?.tipo?.startsWith('lavoura_')) {
+        await ensureLavouraTables()
         // ── Maquinário Lavoura → lavoura_garagem (loop qty) ────────────────
         const tipoMaq = modelo.tipo.replace('lavoura_', '')
         const marca = pedido.modelo_nome.split(' ')[0] === 'John'
           ? 'John Deere' : pedido.modelo_nome.split(' ')[0]
         for (let i = 0; i < qty; i++) {
           await queryOne(
-            `INSERT INTO lavoura_garagem (jogador_id, tipo, marca, nome)
-             VALUES ($1,$2,$3,$4) RETURNING id`,
-            [pedido.jogador_id, tipoMaq, marca, pedido.modelo_nome]
+            `INSERT INTO lavoura_garagem (jogador_id, tipo, marca, nome, capacidade)
+             VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+            [pedido.jogador_id, tipoMaq, marca, pedido.modelo_nome, modelo.capacidade || null]
           )
         }
         const label = qty > 1 ? `${qty}× ${pedido.modelo_nome}` : pedido.modelo_nome

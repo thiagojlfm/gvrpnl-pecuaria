@@ -1,7 +1,10 @@
 import { query, queryOne } from '../../../lib/db'
 import { verifyToken, getTokenFromReq } from '../../../lib/auth'
+import { ensureLavouraTables } from '../../../lib/lavoura_schema'
 
 export default async function handler(req, res) {
+  await ensureLavouraTables()
+
   const token = getTokenFromReq(req)
   const user  = token ? verifyToken(token) : null
   if (!user) return res.status(401).json({ error: 'Não autorizado' })

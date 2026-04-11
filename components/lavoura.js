@@ -58,15 +58,6 @@ const tempoStr = fim => {
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`
 }
-const sortearClima = () => {
-  const roll = Math.random()
-  let acc = 0
-  for (const [key, c] of Object.entries(CLIMAS)) {
-    acc += c.prob
-    if (roll < acc) return key
-  }
-  return 'normal'
-}
 function calcReceita(campo) {
   const cfg = CULTURAS[campo.cultura]
   const cli = CLIMAS[campo.clima || 'normal']
@@ -79,50 +70,14 @@ function calcLucro(campo) {
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
-const _n = Date.now()
-function makeCampo(id, cultura, ha, status, opts = {}) {
-  return { id, cultura, area_ha:ha, marca_maquina:'Valtra', status, custo_total:ha*CULTURAS[cultura].custo, resultado:null, clima:null, ...opts }
-}
-const MOCK_GARAGEM = [
-  { id:1, tipo:'trator',        marca:'John Deere', nome:'John Deere 6M'   },
-  { id:2, tipo:'plantadeira',   marca:'John Deere', nome:'John Deere DB60' },
-  { id:3, tipo:'colheitadeira', marca:'Fendt',      nome:'Fendt IDEAL 9T'  },
-  { id:4, tipo:'trator',        marca:'Valtra',     nome:'Valtra A110'     },
-]
-const MOCK_CAMPOS = [
-  makeCampo(1,'milho',20,'arando',{
-    marca_maquina:'John Deere',
-    inicio_op: new Date(_n - 4*_h).toISOString(),
-    fim_op:    new Date(_n + 3*_h).toISOString(),
-  }),
-  makeCampo(2,'soja',10,'crescendo',{
-    marca_maquina:'Fendt',
-    inicio_op: new Date(_n - 3*_d).toISOString(),
-    fim_op:    new Date(_n + 4*_d).toISOString(),
-    clima: 'ideal',
-  }),
-  makeCampo(3,'milho',15,'pronto',{ marca_maquina:'John Deere', clima:'granizo' }),
-  makeCampo(4,'capim',30,'crescendo',{
-    marca_maquina:'Valtra',
-    inicio_op: new Date(_n - 5*_d).toISOString(),
-    fim_op:    new Date(_n + 9*_d).toISOString(),
-  }),
-  makeCampo(5,'capim',20,'liberado',{
-    marca_maquina:'Valtra',
-    clima:'normal',
-    inicio_pasto: new Date(_n - 12*_d).toISOString(),
-    fim_pasto:    new Date(_n + 18*_d).toISOString(),
-  }),
-]
 // Mock initial fazenda state — capim liberar adiciona boostCapim
 // O pasto liberado do campo 5 (20ha * 1.5 normal = 30ha) já está ativo
-const MOCK_FAZENDA_INICIAL = { capacidadeBase: 40, boostCapim: 30 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ENTRY POINT
 // ═══════════════════════════════════════════════════════════════════════════════
 export function LavouraPage({ T, user, api, notify, sounds: snd = defaultSounds }) {
-  if (user?.role !== 'admin') return <LavouraTeaser />
+  if (!user) return <LavouraTeaser />
   return <LavouraAdmin api={api} user={user} notify={notify} snd={snd} />
 }
 
@@ -452,12 +407,11 @@ function LavouraAdmin({ api, user, notify, snd }) {
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
             <span style={{fontSize:18}}>🌱</span>
             <h1 style={{fontFamily:'var(--font-disp)',fontSize:28,letterSpacing:1,color:'var(--ice)',fontWeight:700,lineHeight:1}}>
-              Lavoura <span style={{color:'var(--gold)'}}>/ Admin</span>
+              Lavoura {user?.role === 'admin' && <span style={{color:'var(--gold)'}}>/ Admin</span>}
             </h1>
           </div>
-          <p style={{fontSize:11,color:'var(--ice3)',fontFamily:'var(--font-data)',marginTop:4}}>Dados mockados — API e integração com Celeiro/Pecuária serão plugadas em breve</p>
+          <p style={{fontSize:11,color:'var(--ice3)',fontFamily:'var(--font-data)',marginTop:4}}>Plante, gerencie e colha — integrado ao Celeiro e Pecuária</p>
         </div>
-        <span style={{fontSize:8,fontWeight:800,letterSpacing:2,background:'rgba(194,140,70,.15)',color:'var(--gold)',border:'1px solid rgba(194,140,70,.3)',padding:'4px 10px',borderRadius:4,fontFamily:'var(--font-data)'}}>MODO TESTE</span>
       </div>
 
       {/* ── KPIs ── */}

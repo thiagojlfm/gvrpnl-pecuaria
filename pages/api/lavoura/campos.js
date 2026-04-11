@@ -1,5 +1,6 @@
 import { query, queryOne } from '../../../lib/db'
 import { verifyToken, getTokenFromReq } from '../../../lib/auth'
+import { ensureLavouraTables } from '../../../lib/lavoura_schema'
 
 const _d = 86400000
 const CAP_MARCA    = { Valtra: 30, 'John Deere': 70, Fendt: 150 }
@@ -32,7 +33,20 @@ function sortearClima() {
   return 'normal'
 }
 
+async function creditarEstoqueRacao(jogador_id, kgRacao) {
+  await query(
+    `INSERT INTO estoque_racao (jogador_id, kg_disponivel)
+     VALUES ($1, $2)
+     ON CONFLICT (jogador_id) DO UPDATE
+       SET kg_disponivel = estoque_racao.kg_disponivel + $2,
+           atualizado_em = now()`,
+    [jogador_id, kgRacao]
+  )
+}
+
 export default async function handler(req, res) {
+  await ensureLavouraTables()
+
   const token = getTokenFromReq(req)
   const user  = token ? verifyToken(token) : null
   if (!user) return res.status(401).json({ error: 'Não autorizado' })
@@ -58,11 +72,11 @@ export default async function handler(req, res) {
 
   // POST — plantar novo campo
   if (req.method === 'POST') {
-    const { cultura, area_ha, marca_maquina } = req.body
+    const { cultura, area_ha } = req.body
     const jogador_id = user.id
 
-    if (!cultura || !area_ha || !marca_maquina)
-      return res.status(400).json({ error: 'cultura, area_ha e marca_maquina são obrigatórios' })
+    if (!cultura || !area_ha)
+      return res.status(400).json({ error: 'cultura e area_ha são obrigatórios' })
 
     // Validação: jogador tem trator e plantadeira?
     const { data: garagem } = await query(
@@ -72,6 +86,9 @@ export default async function handler(req, res) {
     const temPlantadeira = garagem?.some(m => m.tipo === 'plantadeira')
     if (!temTrator || !temPlantadeira)
       return res.status(400).json({ error: 'Você precisa de trator e plantadeira na garagem.' })
+
+    // Deriva marca do trator a partir da garagem (não confia no cliente)
+    const marca_maquina = garagem.find(m => m.tipo === 'trator')?.marca || 'Valtra'
 
     // Validação: capacidade da frota
     const capFrota = Math.min(
@@ -186,14 +203,7 @@ export default async function handler(req, res) {
         const kgRacao = Math.round(receita / PRECO_RACAO)
         resultado = `+${kgRacao} kg ração`
         // Adiciona ao estoque de ração do jogador
-        await query(
-          `INSERT INTO lavoura_estoque_racao (jogador_id, kg_disponivel)
-           VALUES ($1, $2)
-           ON CONFLICT (jogador_id) DO UPDATE
-             SET kg_disponivel = lavoura_estoque_racao.kg_disponivel + $2,
-                 atualizado_em = now()`,
-          [campo.jogador_id, kgRacao]
-        )
+        await creditarEstoqueRacao(campo.jogador_id, kgRacao)
       }
 
       const { data, error } = await queryOne(
@@ -286,7 +296,28 @@ async function autoAvancar(jogador_id) {
     [jogador_id, now]
   )
 
-  // colhendo → concluir (soja/milho — chama lógica de receita)
-  // Só marca como pendente para o frontend acionar concluir_colheita
-  // (receita calculada no PATCH action=concluir_colheita)
+  // colhendo → colhido (auto-conclusão quando fim_op passou)
+  const { data: colhendos } = await query(
+    `SELECT * FROM lavoura_campos WHERE jogador_id=$1 AND status='colhendo' AND fim_op < $2`,
+    [jogador_id, now]
+  )
+  for (const campo of (colhendos || [])) {
+    const cli     = CLIMAS[campo.clima || 'normal']
+    const receita = Math.round(campo.area_ha * (RECEITA_BASE[campo.cultura] || 0) * cli.mult)
+    let resultado = ''
+
+    if (campo.cultura === 'soja') {
+      resultado = `$${receita} — ADDMONEY`
+    } else if (campo.cultura === 'milho') {
+      const kgRacao = Math.round(receita / PRECO_RACAO)
+      resultado = `+${kgRacao} kg ração`
+      await creditarEstoqueRacao(campo.jogador_id, kgRacao)
+    }
+
+    await query(
+      `UPDATE lavoura_campos SET status='colhido', resultado=$1, fim_op=null, atualizado_em=now()
+       WHERE id=$2`,
+      [resultado, campo.id]
+    )
+  }
 }

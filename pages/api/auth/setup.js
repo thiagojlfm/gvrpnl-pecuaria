@@ -1,8 +1,5 @@
-import bcrypt from 'bcryptjs'
-import { query } from '../../../lib/db'
-
+// Rota de setup desabilitada por segurança.
+// Para resetar a senha do admin, use o banco diretamente.
 export default async function handler(req, res) {
-  const hash = await bcrypt.hash('admin123', 10)
-  await query(`update usuarios set password_hash = $1 where username = 'admin'`, [hash])
-  res.json({ ok: true, hash })
+  return res.status(404).json({ error: 'Not found' })
 }
