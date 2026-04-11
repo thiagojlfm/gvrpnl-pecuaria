@@ -36,12 +36,12 @@ export default async function handler(req, res) {
 
     if (nova_senha) {
       if (!user.role === 'admin') {
-        const { data: u } = await queryOne(`SELECT senha FROM usuarios WHERE id = $1`, [user.id])
-        const ok = await bcrypt.compare(senha_atual, u?.senha || '')
+        const { data: u } = await queryOne(`SELECT password_hash FROM usuarios WHERE id = $1`, [user.id])
+        const ok = await bcrypt.compare(senha_atual, u?.password_hash || '')
         if (!ok) return res.status(400).json({ error: 'Senha atual incorreta' })
       }
       const hash = await bcrypt.hash(nova_senha, 10)
-      updates.push(`senha=$${i++}`); vals.push(hash)
+      updates.push(`password_hash=$${i++}`); vals.push(hash)
     }
 
     if (!updates.length) return res.status(400).json({ error: 'Nada para atualizar' })
