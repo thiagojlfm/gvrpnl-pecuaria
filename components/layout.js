@@ -17,7 +17,7 @@ export const NAV_ITEMS = [
   {id:'transportadora',icon:'🚛',label:'Transportadora',pub:false},
   {id:'fretes_npc',icon:'🤖',label:'Fretes NPC',pub:false},
   {id:'concessionaria',icon:'🏢',label:'Concessionária',pub:false},
-  {id:'lavoura',icon:'🌱',label:'Lavoura',pub:true,badge:'EM BREVE'},
+  {id:'lavoura',icon:'🌱',label:'Lavoura',pub:true,badge:'NOVO'},
   {id:'noticias',icon:'📰',label:'Notícias',pub:true,hot:true},
   {id:'ranking',icon:'🏆',label:'Ranking',pub:true},
   {id:'ajuda',icon:'❓',label:'Ajuda',pub:true},
