@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     if (status !== undefined && user.role === 'admin') { updates.push(`status=$${i++}`); vals.push(status) }
 
     if (nova_senha) {
-      if (!user.role === 'admin') {
+      if (user.role !== 'admin') {
         const { data: u } = await queryOne(`SELECT password_hash FROM usuarios WHERE id = $1`, [user.id])
         const ok = await bcrypt.compare(senha_atual, u?.password_hash || '')
         if (!ok) return res.status(400).json({ error: 'Senha atual incorreta' })

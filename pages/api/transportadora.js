@@ -193,6 +193,17 @@ export default async function handler(req, res) {
   if (req.method === 'PATCH') {
     const { id, status, pago } = req.body
 
+    // Ownership validation: only admin, the assigned transportador, or the comprador can mutate this frete
+    const { data: freteExistente } = await queryOne(
+      `SELECT transportador_id, comprador_id FROM fretes_transportadora WHERE id=$1`, [id]
+    )
+    if (!freteExistente) return res.status(404).json({ error: 'Frete não encontrado' })
+    const isOwner = String(freteExistente.transportador_id) === String(user.id)
+                 || String(freteExistente.comprador_id)    === String(user.id)
+    if (user.role !== 'admin' && !isOwner) {
+      return res.status(403).json({ error: 'Sem permissão para alterar este frete' })
+    }
+
     if (pago !== undefined && user.role === 'admin') {
       // Admin marca como pago
       const { data: frete } = await queryOne(`SELECT * FROM fretes_transportadora WHERE id=$1`, [id])
@@ -214,6 +225,7 @@ export default async function handler(req, res) {
       // Fluxo ração manual: liberado → retirado → entregue
       // 'atribuir' — admin atribui van e libera bloco
       if (status === 'atribuir') {
+        if (user.role !== 'admin') return res.status(403).json({ error: 'Apenas admin pode atribuir transportadores' })
         const { transportador_id, transportador_nome, caminhao_id } = req.body
         if (!transportador_id) return res.status(400).json({ error: 'Selecione um transportador' })
 

@@ -1,10 +1,8 @@
 import { query, queryOne } from '../../lib/db'
-import { verifyToken, getTokenFromReq } from '../../lib/auth'
+import { withAuth } from '../../lib/auth'
 
-export default async function handler(req, res) {
-  const token = getTokenFromReq(req)
-  const user = token ? verifyToken(token) : null
-  if (!user) return res.status(401).json({ error: 'Não autorizado' })
+async function handler(req, res) {
+  const { user } = req
 
   // GET — estoque de ração do jogador
   if (req.method === 'GET') {
@@ -48,3 +46,5 @@ export default async function handler(req, res) {
 
   res.status(405).end()
 }
+
+export default withAuth(handler)

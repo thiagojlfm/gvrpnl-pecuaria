@@ -667,31 +667,38 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes: lotesProp, merca
   // Prefere lotesLocal (fetch próprio) → fallback para prop do pai
   const minhasLotes = (lotesLocal ?? lotesProp ?? []).filter(l => l.status === 'ativo')
 
-  // Mapa: fazenda_id real → objeto fazenda (exclui pasto_ fakes pois têm IDs fake)
-  const fazMap = new Map(
-    fazendas
-      .filter(f => !String(f.id).startsWith('pasto_'))
-      .map(f => [String(f.id), f])
-  )
-
-  // Agrupa lotes por fazenda_id → [{fazenda, lotes, cap}]
-  const gruposMap = {}
+  // Indexa os lotes por fazenda para conseguirmos renderizar também as propriedades vazias.
+  const lotesPorFazenda = new Map()
   minhasLotes.forEach(l => {
     const key = String(l.fazenda_id ?? 'sem_fazenda')
-    if (!gruposMap[key]) gruposMap[key] = []
-    gruposMap[key].push(l)
+    if (!lotesPorFazenda.has(key)) lotesPorFazenda.set(key, [])
+    lotesPorFazenda.get(key).push(l)
   })
-  const grupos = Object.entries(gruposMap).map(([fazId, gLotes]) => {
-    const fazenda = fazMap.get(fazId) || null
-    const gcap = fazenda ? calcCapacidade(gLotes, Number(fazenda.tamanho_ha)) : null
-    return { fazId, fazenda, lotes: gLotes, cap: gcap }
-  }).sort((a, b) => (a.fazenda ? 0 : 1) - (b.fazenda ? 0 : 1))
+
+  // Cada fazenda/pasto alugado aparece mesmo sem gado. Os lotes sem vínculo entram num grupo separado.
+  const grupos = fazendas.map(fazenda => {
+    const gLotes = lotesPorFazenda.get(String(fazenda.id)) || []
+    const gcap = calcCapacidade(gLotes, Number(fazenda.tamanho_ha || 0))
+    return { fazId: String(fazenda.id), fazenda, lotes: gLotes, cap: gcap }
+  })
+
+  if (lotesPorFazenda.has('sem_fazenda')) {
+    grupos.push({
+      fazId: 'sem_fazenda',
+      fazenda: null,
+      lotes: lotesPorFazenda.get('sem_fazenda') || [],
+      cap: null,
+    })
+  }
 
   // Verifica se alguma fazenda está superlotada (para AlertasPanel e AluguelPastoNPC)
   const algumaSuplertolada = grupos.find(g => g.cap?.lotada) || null
 
   // Somente fazendas reais (sem pasto_ fake) para o seletor de Serviços
   const realFazendas = fazendas.filter(f => !String(f.id).startsWith('pasto_'))
+  const capacidadeTotalHa = grupos.reduce((s, g) => s + Number(g.cap?.total || 0), 0)
+  const capacidadeUsadaHa = grupos.reduce((s, g) => s + Number(g.cap?.usada || 0), 0)
+  const capacidadePctTotal = capacidadeTotalHa > 0 ? Math.min((capacidadeUsadaHa / capacidadeTotalHa) * 100, 100) : 0
   const custosPend = custos.filter(c => c.status === 'pendente').length
 
   async function abrirChamado() {
@@ -740,6 +747,32 @@ export function MinhaFazendaPage({ T, user, api, notify, lotes: lotesProp, merca
         </div>
         <p style={{ fontSize:13, color:T.textMuted, marginLeft:36 }}>Gestão da sua propriedade rural · {minhasLotes.reduce((s,l)=>s+l.quantidade,0)} cabeças no total</p>
       </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:10, marginBottom:16 }}>
+        {[
+          { label:'Propriedades', value:fazendas.length, color:T.text },
+          { label:'Capacidade Total', value:`${capacidadeTotalHa.toFixed(1)} ha`, color:T.gold },
+          { label:'Capacidade Usada', value:`${capacidadeUsadaHa.toFixed(1)} ha`, color:capacidadePctTotal >= 100 ? '#f87171' : T.text },
+        ].map(m => (
+          <div key={m.label} style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:12, padding:'14px 16px' }}>
+            <div style={{ fontSize:10, color:T.textMuted, textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>{m.label}</div>
+            <div style={{ fontSize:18, fontWeight:800, color:m.color, fontFamily:"'Playfair Display',serif" }}>{m.value}</div>
+          </div>
+        ))}
+      </div>
+      {capacidadeTotalHa > 0 && (
+        <div style={{ background:T.card, border:`1px solid ${capacidadePctTotal >= 100 ? '#6a1818' : T.border}`, borderRadius:12, padding:'12px 16px', marginBottom:16 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:T.textMuted, marginBottom:6 }}>
+            <span>Capacidade consolidada do jogador</span>
+            <span style={{ fontWeight:700, color:capacidadePctTotal >= 100 ? '#f87171' : T.gold }}>
+              {capacidadeUsadaHa.toFixed(1)} / {capacidadeTotalHa.toFixed(1)} ha
+            </span>
+          </div>
+          <div style={{ background:T.border, borderRadius:6, height:8, overflow:'hidden' }}>
+            <div style={{ width:`${capacidadePctTotal}%`, height:'100%', borderRadius:6, background:capacidadePctTotal >= 100 ? 'linear-gradient(90deg,#c84040,#f87171)' : 'linear-gradient(90deg,#4060d0,#8040c0)' }} />
+          </div>
+        </div>
+      )}
 
       {/* Frete em andamento */}
       {fretes.filter(f => f.status === 'em_transito').map(fr => (

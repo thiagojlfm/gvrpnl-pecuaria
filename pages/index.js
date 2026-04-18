@@ -1,26 +1,24 @@
 import { FazendasPage, MinhaFazendaPage, CeleiroPage, TransportadoraPage, ConcessionariaPage, FretesNPCPage, BotaoOfertaNPC, PastagemPage } from '../components/fazendas_components'
-import { LavouraPage } from '../components/lavoura'
 import { useState, useEffect, useCallback } from 'react'
-import Head from 'next/head'
-import { ThemeContext, AuthContext } from '../lib/context'
-import { CSS, D, L, FASES, PESOS, SEMANAS, fmt } from '../lib/theme'
+import { useRouter } from 'next/router'
+import { useTheme, useAuth } from '../lib/context'
+import { FASES, PESOS, SEMANAS, fmt } from '../lib/theme'
 import { sounds } from '../lib/sounds'
 import { Badge, Card, SectionTitle, Metric, Inp, Sel, Btn, Tbl, Alrt, CountdownRing, MiniChart, faseBadge } from '../components/ui'
-import { NAV_ITEMS, Sidebar, Drawer, ChatPanel, NotifBell, Onboarding, AnimalCard } from '../components/layout'
+import { NAV_ITEMS, ChatPanel, Onboarding, AnimalCard } from '../components/layout'
+import AppShell from '../components/app_shell'
 
 // (primitives and layout components are now imported from components/ui.js and components/layout.js)
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [dark, setDark] = useState(true)
-  const T = dark ? D : L
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const router = useRouter()
+  // Tema, sessão e cliente HTTP agora moram em pages/_app.js (contextos globais).
+  const { T } = useTheme()
+  const { user, setUser, token, setToken, api, notify, logout } = useAuth()
+
   const [page, setPage] = useState('mercado')
   const [pageKey, setPageKey] = useState(0)
-  const [soundOn, setSoundOn] = useState(true)
-  const [user, setUser] = useState(null)
-  const [token, setToken] = useState(null)
   const [authTab, setAuthTab] = useState('login')
   const [loginForm, setLoginForm] = useState({username:'',password:''})
   const [loginErr, setLoginErr] = useState('')
@@ -35,7 +33,6 @@ export default function App() {
   const [users, setUsers] = useState([])
   const [solic, setSolic] = useState([])
   const [racao, setRacao] = useState(null)
-  const [notifs, setNotifs] = useState([])
   const [ranking, setRanking] = useState([])
   const [adminLog, setAdminLog] = useState([])
   const [minhasFazendas, setMinhasFazendas] = useState([])
@@ -43,8 +40,6 @@ export default function App() {
   const [perfil, setPerfil] = useState(null)
   const [editPerfil, setEditPerfil] = useState({fazenda:'',foto_url:'',bio:'',nova_senha:''})
   const [editTarget, setEditTarget] = useState(null)
-  const [notification, setNotification] = useState('')
-  const [notifType, setNotifType] = useState('success')
   const [chatAnuncio, setChatAnuncio] = useState(null)
   const [compraQt, setCompraQt] = useState(1)
   const [faseAberta, setFaseAberta] = useState(null)
@@ -63,34 +58,24 @@ export default function App() {
   const [rebanhoHist, setRebanhoHist] = useState([])
   const [precoHist, setPrecoHist] = useState([])
 
-  const api = useCallback(async (path, opts={}) => {
-    const h = {'Content-Type':'application/json'}
-    if(token) h['Authorization']=`Bearer ${token}`
-    const r = await fetch(path,{...opts,headers:h})
-    if(r.status===401){
-      localStorage.removeItem('gvrpnl_token')
-      localStorage.removeItem('gvrpnl_user')
-      window.location.reload()
-      return {}
-    }
-    return r.json()
-  },[token])
-
   function changePage(p) {
     sounds.click()
     setPage(p)
     setPageKey(k=>k+1)
   }
 
-  useEffect(()=>{
-    const d = localStorage.getItem('gvrpnl_dark')
-    if(d!==null) setDark(d==='true')
-    const s = localStorage.getItem('gvrpnl_sound')
-    if(s!==null) setSoundOn(s==='true')
-    const t = localStorage.getItem('gvrpnl_token')
-    const u = localStorage.getItem('gvrpnl_user')
-    if(t&&u){setToken(t);setUser(JSON.parse(u))}
-  },[])
+  // Intenção de navegação vinda de /lavoura (ou outra rota) — se o usuário
+  // clicou num item de menu não-Lavoura, chega aqui com o destino no sessionStorage.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const target = sessionStorage.getItem('gvrpnl_targetPage')
+    if (target) {
+      sessionStorage.removeItem('gvrpnl_targetPage')
+      setPage(target)
+      setPageKey(k => k + 1)
+      if (target === 'login' || target === 'cadastro') setAuthTab(target)
+    }
+  }, [])
 
   useEffect(()=>{
     fetch('/api/mercado').then(r=>r.json()).then(d=>{
@@ -110,7 +95,6 @@ export default function App() {
     api('/api/transacoes').then(d=>setTrans(safeArr(d)))
     api('/api/solicitacoes').then(d=>setSolic(safeArr(d)))
     api('/api/racao').then(d=>{if(!d?.error) setRacao(d)})
-    api('/api/notificacoes').then(d=>setNotifs(safeArr(d)))
     api('/api/fazendas?minha=1').then(d=>setMinhasFazendas(safeArr(d)))
     api('/api/perfil').then(p=>{if(!p?.error){setPerfil(p);setEditPerfil({fazenda:p.fazenda||'',foto_url:p.foto_url||'',bio:p.bio||'',nova_senha:''})}})
     if(user?.role==='admin'){api('/api/admin/usuarios').then(d=>setUsers(safeArr(d)));api('/api/admin/log').then(d=>setAdminLog(safeArr(d)))}
@@ -118,22 +102,8 @@ export default function App() {
 
   useEffect(()=>{reload()},[reload])
 
-  useEffect(()=>{
-    if(!token) return
-    const iv = setInterval(()=>{
-      if(!document.hidden) api('/api/notificacoes').then(setNotifs)
-    }, 60000)
-    return ()=>clearInterval(iv)
-  },[token,api])
-
-  const notify = (m, t='success') => {
-    setNotification(m); setNotifType(t)
-    if(soundOn) { t==='success'?sounds.success():sounds.error() }
-    setTimeout(()=>setNotification(''), 4000)
-  }
-
-  function toggleDark(){const nd=!dark;setDark(nd);localStorage.setItem('gvrpnl_dark',nd);document.documentElement.setAttribute('data-theme',nd?'dark':'light')}
-  function toggleSound(){const ns=!soundOn;setSoundOn(ns);localStorage.setItem('gvrpnl_sound',ns)}
+  // Nota: notify, readNotif, toggleDark, toggleSound, logout e polling de
+  // notificações agora moram em pages/_app.js e chegam aqui via useAuth/useTheme.
 
   async function login() {
     setLoginErr('')
@@ -154,16 +124,6 @@ export default function App() {
     const d = await r.json()
     if(d.error) return setRegErr(d.error)
     setRegOk(true)
-  }
-
-  function logout(){
-    localStorage.removeItem('gvrpnl_token');localStorage.removeItem('gvrpnl_user')
-    setToken(null);setUser(null);changePage('mercado')
-  }
-
-  async function readNotif(id){
-    await api('/api/notificacoes',{method:'PATCH',body:JSON.stringify({id})})
-    setNotifs(n=>id==='all'?n.map(x=>({...x,lida:true})):n.map(x=>x.id===id?{...x,lida:true}:x))
   }
 
   async function salvarPerfil(targetId){
@@ -202,75 +162,17 @@ export default function App() {
   const consumoDiario = meusLotes.filter(l=>l.status==='ativo').reduce((s,l)=>s+({bezerro:3,garrote:5,boi:8,abatido:0}[l.fase]||0)*l.quantidade,0)
   const diasRacaoLeft = racao?.kg_disponivel>0&&consumoDiario>0?Math.floor(racao.kg_disponivel/consumoDiario):null
   const cot = calcCot(compraQt)
+  const fazendasDoJogadorSelecionado = fazendas.filter(f => String(f.dono_id) === String(nLote.jogador_id))
 
   const gs = (min) => ({display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(${min}px,1fr))`,gap:14})
 
   return (
-    <ThemeContext.Provider value={{ T, dark, setDark }}>
-      <AuthContext.Provider value={{ user, setUser, token, setToken, api }}>
     <>
-    <Head>
-      <title>GVRPNL — Pecuária</title>
-      <meta name="viewport" content="width=device-width,initial-scale=1"/>
-      <style>{CSS}</style>
-    </Head>
-
     {showOnboarding&&<Onboarding onClose={async()=>{await api('/api/perfil',{method:'POST'});setShowOnboarding(false)}} T={T}/>}
     {chatAnuncio&&<ChatPanel anuncio={chatAnuncio} user={user} token={token} onClose={()=>setChatAnuncio(null)} T={T}/>}
 
-    <div style={{display:'flex',height:'100vh',background:T.bg,color:T.text,overflow:'hidden'}}>
-
-      {/* Desktop Sidebar */}
-      <div className="desktop-only">
-        <Sidebar page={page} setPage={changePage} user={user} T={T} collapsed={sidebarCollapsed}/>
-      </div>
-
-      {/* Mobile Drawer */}
-      <Drawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} page={page} setPage={changePage} user={user} T={T}/>
-
-      {/* Main */}
-      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-
-        {/* Header */}
-        <div style={{background:T.navBg,borderBottom:`1px solid ${T.border}`,padding:'0 20px',height:58,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,gap:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:12}}>
-            {/* Hamburguer mobile */}
-            <button className="mobile-only" onClick={()=>setDrawerOpen(true)} style={{background:'none',border:`1px solid ${T.border2}`,borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:18,color:T.text}}>☰</button>
-            {/* Logo desktop */}
-            <div className="desktop-only" style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}} onClick={()=>setSidebarCollapsed(!sidebarCollapsed)}>
-              <div style={{width:34,height:34,borderRadius:8,overflow:'hidden',flexShrink:0}}>
-                <img src="/logo.png" alt="GVRPNL" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-              </div>
-              <div>
-                <div style={{fontSize:14,fontWeight:800,color:T.gold,letterSpacing:'.5px',lineHeight:1}}>GVRPNL</div>
-                <div style={{fontSize:9,color:T.textMuted,letterSpacing:'1px',fontWeight:600}}>PECUÁRIA</div>
-              </div>
-            </div>
-            {/* Titulo página mobile */}
-            <div className="mobile-only" style={{fontSize:15,fontWeight:700,color:T.text,fontFamily:"'Playfair Display',serif"}}>
-              {NAV_ITEMS.find(n=>n.id===page)?.icon} {NAV_ITEMS.find(n=>n.id===page)?.label}
-            </div>
-          </div>
-
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <button onClick={toggleSound} title={soundOn?'Silenciar':'Ativar sons'} style={{background:'none',border:`1px solid ${T.border2}`,borderRadius:8,padding:'6px 9px',cursor:'pointer',fontSize:14,color:T.textMuted,transition:'all .15s'}}>{soundOn?'🔊':'🔇'}</button>
-            <button onClick={toggleDark} style={{background:'none',border:`1px solid ${T.border2}`,borderRadius:8,padding:'6px 9px',cursor:'pointer',fontSize:14,color:T.textMuted,transition:'all .15s'}}>{dark?'☀️':'🌙'}</button>
-            {user&&<NotifBell notifs={notifs} onRead={readNotif} T={T}/>}
-            {user?<>
-              <div className="desktop-only" style={{fontSize:12,color:T.textMuted}}>
-                <div style={{color:T.text,fontWeight:600,lineHeight:1}}>{user.username}</div>
-                {user.fazenda&&<div style={{fontSize:10}}>Faz. {user.fazenda}</div>}
-              </div>
-              <Btn v="ghost" onClick={logout} T={T} style={{padding:'6px 12px',fontSize:12}}>Sair</Btn>
-            </>:<Btn onClick={()=>changePage('login')} T={T} style={{padding:'7px 16px'}}>Entrar</Btn>}
-          </div>
-        </div>
-
-        {/* Notification Bar */}
-        {notification&&<div style={{background:notifType==='success'?'#011a08':'#1a0404',color:notifType==='success'?T.green:'#f87171',padding:'10px 20px',fontSize:13,textAlign:'center',borderBottom:`1px solid ${notifType==='success'?T.greenDark:'#450a0a'}`,fontWeight:500,fontFamily:"'DM Mono',monospace",animation:'fadeIn .3s ease'}}>{notification}</div>}
-
-        {/* Page Content */}
-        <div key={pageKey} className="page-enter" style={{flex:1,overflowY:'auto',padding:'24px 24px',maxWidth:1200,width:'100%',margin:'0 auto',boxSizing:'border-box'}}>
+    <AppShell currentPage={page} setPage={changePage}>
+      <div key={pageKey} className="page-enter">
 
           {/* LOGIN */}
           {(page==='login'||page==='cadastro')&&!user&&(
@@ -1156,14 +1058,14 @@ export default function App() {
               <Card T={T} hover={false}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:T.text,marginBottom:14}}>Registrar compra — Gov. NPC</div>
                 <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:16}}>
-                  <Sel T={T} label="Jogador" value={nLote.jogador_id} onChange={e=>{const u=users.find(x=>x.id===e.target.value);const faz=fazendas.find(f=>String(f.dono_id)===String(u?.id));setNLote(f=>({...f,jogador_id:e.target.value,jogador_nome:u?.username||'',fazenda:u?.fazenda||'',fazenda_id:faz?.id||''}))}}>
+                  <Sel T={T} label="Jogador" value={nLote.jogador_id} onChange={e=>{const jogadorId=e.target.value;const u=users.find(x=>x.id===jogadorId);const fazsJogador=fazendas.filter(f=>String(f.dono_id)===String(jogadorId));const fazPreferida=fazsJogador[0]||null;setNLote(f=>({...f,jogador_id:jogadorId,jogador_nome:u?.username||'',fazenda:fazPreferida?.nome||u?.fazenda||'',fazenda_id:fazPreferida?.id||''}))}}>
                     <option value="">Selecione o jogador...</option>
                     {users.filter(u=>u.role==='jogador'&&u.status==='aprovado').map(u=><option key={u.id} value={u.id}>{u.username}{u.fazenda?` — Faz. ${u.fazenda}`:''}</option>)}
                   </Sel>
                   <div style={gs(120)}>
                     <Sel T={T} label="Fazenda" value={nLote.fazenda_id} onChange={e=>setNLote(f=>({...f,fazenda_id:e.target.value}))}>
                     <option value="">Sem fazenda vinculada</option>
-                    {fazendas.map(f=><option key={f.id} value={f.id}>{f.codigo} — {f.nome} ({f.tamanho_ha}ha){f.dono_nome?` · ${f.dono_nome}`:''}</option>)}
+                    {fazendasDoJogadorSelecionado.map(f=><option key={f.id} value={f.id}>{f.codigo} — {f.nome} ({f.tamanho_ha}ha)</option>)}
                   </Sel>
                   <Inp T={T} label="Quantidade" type="number" value={nLote.quantidade} onChange={e=>setNLote(f=>({...f,quantidade:Number(e.target.value)}))}/>
                     <Inp T={T} label="Preço/cab ($)" type="number" value={nLote.valor_compra} onChange={e=>setNLote(f=>({...f,valor_compra:Number(e.target.value)}))}/>
@@ -1333,9 +1235,7 @@ export default function App() {
           </div>}
 
           {/* ─── LAVOURA ─────────────────────────────────────── */}
-          {page==='lavoura'&&<LavouraPage T={T} user={user} api={api} notify={notify} sounds={sounds}/>}
-          {false&&<div>{/* placeholder — conteúdo movido para components/lavoura.js */}
-          </div>}
+          {/* Lavoura agora é rota nativa em pages/lavoura.js */}
 
           {/* ─── NOTÍCIAS ────────────────────────────────────── */}
           {page==='noticias'&&<div style={{animation:'fadeSlideIn .35s ease',maxWidth:840,margin:'0 auto'}}>
@@ -1414,17 +1314,14 @@ export default function App() {
                   <div style={{fontSize:9,color:'#4ade80',letterSpacing:2,fontFamily:'var(--font-data)',marginBottom:10,fontWeight:700}}>EM BREVE</div>
                   <div style={{fontSize:12,fontWeight:700,color:'#eaddcf',fontFamily:"'Playfair Display',serif",marginBottom:6}}>🌱 Sistema de Lavoura</div>
                   <p style={{fontSize:11,color:'#a6968a',lineHeight:1.6,fontFamily:'var(--font-mono)',marginBottom:10}}>Plante milho, soja e capim. Compre tratores e colheitadeiras das melhores marcas do agro.</p>
-                  <button onClick={()=>setPage('lavoura')} style={{width:'100%',background:'rgba(74,222,128,.1)',border:'1px solid rgba(74,222,128,.3)',color:'#4ade80',borderRadius:6,padding:'8px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-data)',letterSpacing:1}}>VER PRÉVIA →</button>
+                  <button onClick={()=>router.push('/lavoura')} style={{width:'100%',background:'rgba(74,222,128,.1)',border:'1px solid rgba(74,222,128,.3)',color:'#4ade80',borderRadius:6,padding:'8px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-data)',letterSpacing:1}}>VER PRÉVIA →</button>
                 </div>
               </div>
             </div>
           </div>}
 
-        </div>
       </div>
-    </div>
+      </AppShell>
     </>
-      </AuthContext.Provider>
-    </ThemeContext.Provider>
   )
 }

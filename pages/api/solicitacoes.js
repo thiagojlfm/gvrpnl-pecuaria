@@ -22,11 +22,19 @@ export default async function handler(req, res) {
 
   // POST — jogador cria solicitação
   if (req.method === 'POST') {
-    const { quantidade, valor_total, custo_racao, comprovante, fazenda_id } = req.body
+    const { quantidade, comprovante, fazenda_id } = req.body
+    const quantidadeNum = Number(quantidade || 0)
+    if (quantidadeNum <= 0) return res.status(400).json({ error: 'Quantidade invalida' })
+
+    // Hotfix AppSec: o servidor recalcula o valor base da compra.
+    const PRECO_BEZERRO = 950
+    const FRETE_POR_CAB = 50
+    const valorTotal = quantidadeNum * (PRECO_BEZERRO + FRETE_POR_CAB)
+
     const { data, error } = await queryOne(
       `INSERT INTO solicitacoes (jogador_id, jogador_nome, fazenda, quantidade, valor_total, custo_racao, comprovante, fazenda_id, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pendente') RETURNING *`,
-      [user.id, user.username, user.fazenda || '', quantidade, valor_total, custo_racao, comprovante, fazenda_id || null]
+      [user.id, user.username, user.fazenda || '', quantidadeNum, valorTotal, 0, comprovante, fazenda_id || null]
     )
     if (error) return res.status(500).json({ error: error.message })
     return res.json(data)

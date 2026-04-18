@@ -6,6 +6,16 @@ const PESOS = { bezerro:180, garrote:400, boi:540, abatido:648 }
 const FASES = ['bezerro','garrote','boi','abatido']
 const FASE_NOMES = { bezerro:'Bezerro', garrote:'Garrote', boi:'Boi', abatido:'Boi Abatido' }
 
+async function getPrecoKgAbateAtual() {
+  const { data: lotesMercado } = await query(
+    `SELECT fase, quantidade FROM lotes WHERE status IN ('ativo','aguardando_pagamento','em_transito')`,
+    []
+  )
+  const total = (lotesMercado || []).reduce((s, l) => (l.fase !== 'abatido' ? s + Number(l.quantidade || 0) : s), 0)
+  const ratio = Math.min(total / 400, 1)
+  return Number((3.09 + (1 - ratio) * 0.13).toFixed(2))
+}
+
 async function notificar(jogador_id, titulo, mensagem) {
   await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
     [jogador_id, titulo, mensagem]).catch(()=>{})
@@ -34,7 +44,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Sem permissão' })
     if (lote.fase !== 'abatido')
       return res.status(400).json({ error: 'Lote ainda não está na fase de abate' })
-    const precoKg = Number(body.preco_kg) || 3
+    const precoKg = await getPrecoKgAbateAtual()
     const valorAbate = Math.round(lote.quantidade * 648 * precoKg)
     const { data, error } = await queryOne(
       `UPDATE lotes SET status='aguardando_pagamento', valor_abate=$1 WHERE id=$2 RETURNING *`,

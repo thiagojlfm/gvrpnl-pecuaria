@@ -9,7 +9,11 @@
       "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" status --short)",
       "Bash(git -C \"/d/DOCUMENTOS/GitHub/gvrpnl-pecuaria\" add components/lavoura.js pages/api/concessionaria.js)",
       "Bash(git -C:*)",
-      "Bash(node -e \"require\\(''''./components/fazendas_components.js''''\\)\")"
+      "Bash(node -e \"require\\(''''./components/fazendas_components.js''''\\)\")",
+      "Bash(npx next *)",
+      "Bash(cmd.exe //c \"npx next build\")",
+      "Bash(where node *)",
+      "Bash(where npm *)"
     ]
   }
 }

@@ -1,8 +1,34 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/router'
 import { useTheme } from '../lib/context'
 import { sounds } from '../lib/sounds'
 import { FASES, SEMANAS, PESOS, fmt } from '../lib/theme'
 import { Badge, Btn, faseBadge } from './ui'
+
+// ─── Helpers de navegação ─────────────────────────────────────────────────────
+// Cada nav item pode ter uma rota própria. Itens sem `href` seguem no fluxo
+// legado do index.js via setPage (SPA interna). Para saltar entre rotas
+// mantendo a intenção do clique, usamos sessionStorage.
+const NAV_HREFS = { lavoura: '/lavoura' }
+
+function navigateFromAnywhere(router, id, setPage) {
+  const href = NAV_HREFS[id]
+  if (href) {
+    if (router.pathname !== href) router.push(href)
+    return
+  }
+  // Alvo mora em /. Se já estamos em /, só setPage. Senão, guarda o destino e rota.
+  if (router.pathname === '/') return setPage?.(id)
+  if (typeof window !== 'undefined') sessionStorage.setItem('gvrpnl_targetPage', id)
+  router.push('/')
+}
+
+function isNavActive(router, page, n) {
+  const href = NAV_HREFS[n.id]
+  if (href) return router.pathname === href
+  return router.pathname === '/' && page === n.id
+}
 
 // ─── NAV_ITEMS ────────────────────────────────────────────────────────────────
 export const NAV_ITEMS = [
@@ -29,20 +55,29 @@ export const NAV_ITEMS = [
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 export function Sidebar({page, setPage, user, T: TProp, collapsed}) {
   const ctx = useTheme()
+  const router = useRouter()
   const T = TProp || (ctx ? ctx.T : null)
   const items = NAV_ITEMS.filter(n=>n.pub||user).filter(n=>!n.admin||user?.role==='admin')
   return <div style={{width:collapsed?68:212,flexShrink:0,background:T.navBg,borderRight:`1px solid ${T.border}`,display:'flex',flexDirection:'column',padding:'12px 8px',gap:2,transition:'width .25s ease',overflowX:'hidden'}}>
     {items.map(n=>{
-      const active = page===n.id
+      const active = isNavActive(router, page, n)
+      const href = NAV_HREFS[n.id]
       const idleColor = active ? T.gold : n.hot ? '#f87171' : T.textMuted
       const activeBg = n.hot ? 'rgba(248,113,113,.18)' : 'rgba(194,140,70,.16)'
-      return <button key={n.id} className="nav-btn" onClick={()=>{sounds.click();setPage(n.id)}} style={{display:'flex',alignItems:'center',gap:10,padding:'11px 14px',borderRadius:10,border:'none',cursor:'pointer',background:active?activeBg:n.hot&&!active?'rgba(248,113,113,.05)':'transparent',color:idleColor,whiteSpace:'nowrap',fontFamily:"'Inter',sans-serif",fontSize:13,fontWeight:active?600:400,textAlign:'left',width:'100%',outline:'none'}} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=T.isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)';e.currentTarget.style.color=T.text}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background=n.hot?'rgba(248,113,113,.05)':'transparent';e.currentTarget.style.color=idleColor}}}>
+      const btnStyle = {display:'flex',alignItems:'center',gap:10,padding:'11px 14px',borderRadius:10,border:'none',cursor:'pointer',background:active?activeBg:n.hot&&!active?'rgba(248,113,113,.05)':'transparent',color:idleColor,whiteSpace:'nowrap',fontFamily:"'Inter',sans-serif",fontSize:13,fontWeight:active?600:400,textAlign:'left',width:'100%',outline:'none',textDecoration:'none'}
+      const onEnter = e=>{if(!active){e.currentTarget.style.background=T.isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)';e.currentTarget.style.color=T.text}}
+      const onLeave = e=>{if(!active){e.currentTarget.style.background=n.hot?'rgba(248,113,113,.05)':'transparent';e.currentTarget.style.color=idleColor}}
+      const inner = <>
         <span style={{fontSize:17,flexShrink:0,lineHeight:1}}>{n.icon}</span>
         {!collapsed&&<span style={{lineHeight:1}}>{n.label}</span>}
         {!collapsed&&n.badge&&!active&&<span style={{marginLeft:'auto',fontSize:8,fontWeight:700,letterSpacing:.8,background:n.hot?'rgba(248,113,113,.18)':'rgba(194,140,70,.18)',color:n.hot?'#f87171':T.gold,padding:'2px 6px',borderRadius:5,border:`1px solid ${n.hot?'rgba(248,113,113,.35)':'rgba(194,140,70,.35)'}`}}>{n.badge}</span>}
         {active&&!collapsed&&!n.badge&&<div style={{marginLeft:'auto',width:5,height:5,borderRadius:'50%',background:n.hot?'#f87171':T.gold,boxShadow:`0 0 6px ${n.hot?'#f87171':T.gold}`}}/>}
         {n.hot&&!active&&!collapsed&&<div style={{marginLeft:n.badge?4:'auto',width:6,height:6,borderRadius:'50%',background:'#f87171',animation:'blinkDot 1s step-end infinite',flexShrink:0}}/>}
-      </button>
+      </>
+      if (href) {
+        return <Link key={n.id} href={href} className="nav-btn" onClick={()=>sounds.click()} onMouseEnter={onEnter} onMouseLeave={onLeave} style={btnStyle}>{inner}</Link>
+      }
+      return <button key={n.id} className="nav-btn" onClick={()=>{sounds.click();navigateFromAnywhere(router, n.id, setPage)}} style={btnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>{inner}</button>
     })}
   </div>
 }
@@ -50,6 +85,7 @@ export function Sidebar({page, setPage, user, T: TProp, collapsed}) {
 // ─── Drawer (Mobile) ──────────────────────────────────────────────────────────
 export function Drawer({open, onClose, page, setPage, user, T: TProp}) {
   const ctx = useTheme()
+  const router = useRouter()
   const T = TProp || (ctx ? ctx.T : null)
   const items = NAV_ITEMS.filter(n=>n.pub||user).filter(n=>!n.admin||user?.role==='admin')
   if(!open) return null
@@ -65,14 +101,22 @@ export function Drawer({open, onClose, page, setPage, user, T: TProp}) {
         <button onClick={onClose} style={{marginLeft:'auto',background:'none',border:'none',color:T.textMuted,fontSize:22,cursor:'pointer'}}>×</button>
       </div>
       {items.map(n=>{
-        const active = page===n.id
-        return <button key={n.id} className="nav-btn" onClick={()=>{sounds.click();setPage(n.id);onClose()}} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderRadius:10,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.16)`:n.hot&&!active?'rgba(248,113,113,.05)':'transparent',color:active?T.gold:n.hot?'#f87171':T.textMuted,fontFamily:"'Inter',sans-serif",fontSize:14,fontWeight:active?600:400,textAlign:'left',width:'100%',outline:'none'}} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=T.isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)';e.currentTarget.style.color=T.text}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background=n.hot?'rgba(248,113,113,.05)':'transparent';e.currentTarget.style.color=active?T.gold:n.hot?'#f87171':T.textMuted}}}>
+        const active = isNavActive(router, page, n)
+        const href = NAV_HREFS[n.id]
+        const btnStyle = {display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderRadius:10,border:'none',cursor:'pointer',background:active?`rgba(194,140,70,.16)`:n.hot&&!active?'rgba(248,113,113,.05)':'transparent',color:active?T.gold:n.hot?'#f87171':T.textMuted,fontFamily:"'Inter',sans-serif",fontSize:14,fontWeight:active?600:400,textAlign:'left',width:'100%',outline:'none',textDecoration:'none'}
+        const onEnter = e=>{if(!active){e.currentTarget.style.background=T.isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)';e.currentTarget.style.color=T.text}}
+        const onLeave = e=>{if(!active){e.currentTarget.style.background=n.hot?'rgba(248,113,113,.05)':'transparent';e.currentTarget.style.color=active?T.gold:n.hot?'#f87171':T.textMuted}}
+        const inner = <>
           <span style={{fontSize:20,lineHeight:1}}>{n.icon}</span>
           <span style={{lineHeight:1}}>{n.label}</span>
           {n.badge&&!active&&<span style={{marginLeft:'auto',fontSize:8,fontWeight:700,letterSpacing:.8,background:n.hot?'rgba(248,113,113,.18)':'rgba(194,140,70,.18)',color:n.hot?'#f87171':T.gold,padding:'2px 6px',borderRadius:5,border:`1px solid ${n.hot?'rgba(248,113,113,.35)':'rgba(194,140,70,.35)'}`}}>{n.badge}</span>}
           {active&&!n.badge&&<div style={{marginLeft:'auto',width:6,height:6,borderRadius:'50%',background:T.gold,boxShadow:`0 0 6px ${T.gold}`}}/>}
           {n.hot&&!active&&<div style={{marginLeft:n.badge?4:'auto',width:7,height:7,borderRadius:'50%',background:'#f87171',animation:'blinkDot 1s step-end infinite'}}/>}
-        </button>
+        </>
+        if (href) {
+          return <Link key={n.id} href={href} className="nav-btn" onClick={()=>{sounds.click();onClose()}} onMouseEnter={onEnter} onMouseLeave={onLeave} style={btnStyle}>{inner}</Link>
+        }
+        return <button key={n.id} className="nav-btn" onClick={()=>{sounds.click();navigateFromAnywhere(router, n.id, setPage);onClose()}} style={btnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>{inner}</button>
       })}
     </div>
   </>

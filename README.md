@@ -16,13 +16,15 @@ O SQL já foi executado no Neon. Banco pronto.
 1. Acesse https://vercel.com/new
 2. Conecte o repositório gvrpnl-pecuaria
 3. Em Environment Variables adicione:
-   - DATABASE_URL = postgresql://neondb_owner:npg_pMY8WHmDT2RL@ep-lively-shape-acrlveyo-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-   - JWT_SECRET = gvrpnl_secret_2026
+   - DATABASE_URL = `<YOUR_NEON_DATABASE_URL>` (copie do painel do Neon)
+   - JWT_SECRET = `<GENERATE_A_STRONG_RANDOM_SECRET>` (ex.: `openssl rand -hex 32`)
 4. Deploy!
 
+> ⚠️ **Nunca** faça commit de URLs de banco, chaves JWT ou senhas reais. Use apenas variáveis de ambiente.
+
 ### 4. Primeiro acesso
-- Login: admin / admin123
-- TROQUE A SENHA depois!
+- Crie o usuário admin manualmente no banco (ou via script de seed local) com uma senha forte gerada por você.
+- Nunca reutilize a senha em outro ambiente.
 
 ## Ciclo do gado
 - Semana 1 — Bezerro (180kg) · Gov. NPC · $900 fixo
