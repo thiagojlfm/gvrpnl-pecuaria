@@ -1,5 +1,6 @@
 import { query, queryOne } from '../../lib/db'
 import { verifyToken, getTokenFromReq } from '../../lib/auth'
+import { allocateFarm } from '../../lib/allocate'
 
 export default async function handler(req, res) {
   const token = getTokenFromReq(req)
@@ -80,40 +81,39 @@ export default async function handler(req, res) {
       const { data: jogador } = await queryOne(`SELECT * FROM usuarios WHERE id = $1`, [solic.jogador_id])
 
       // ── Auto-distribuição de fazenda ──────────────────────────────────────
-      const CAP_SOL = { bezerro: 3, garrote: 2, boi: 1, abatido: 1 }
-      const necessarioHa = solic.quantidade / 3 // bezerros ocupam 3/ha
+      // Varre TODAS as fazendas do jogador, acha a primeira com espaço para
+      // todo o lote. Se nenhuma couber, BLOQUEIA a aprovação — nada de
+      // superlotação silenciosa. O admin pode recusar ou pedir ao jogador que
+      // venda/alugue pasto antes de reaprovar.
+      const aloc = await allocateFarm(solic.jogador_id, solic.quantidade, solic.fazenda_id || null, 'bezerro')
 
-      const { data: fazsJogador } = await query(
-        `SELECT * FROM fazendas WHERE dono_id = $1 ORDER BY tamanho_ha DESC`, [solic.jogador_id]
-      )
-
-      // Ordena: fazenda solicitada primeiro, depois por tamanho desc
-      const candidatas = [...(fazsJogador||[])]
-      if (solic.fazenda_id) {
-        const idx = candidatas.findIndex(f => String(f.id) === String(solic.fazenda_id))
-        if (idx > 0) { const [fav] = candidatas.splice(idx, 1); candidatas.unshift(fav) }
+      if (aloc.fazendas.length === 0) {
+        await query(`UPDATE solicitacoes SET status='pendente' WHERE id=$1`, [id])
+        return res.status(400).json({ error: `${solic.jogador_nome} não possui nenhuma fazenda cadastrada.` })
       }
 
-      let fazEscolhida = null
-      for (const faz of candidatas) {
-        const { data: lAtivos } = await query(
-          `SELECT fase, quantidade FROM lotes WHERE fazenda_id = $1 AND status NOT IN ('pago','vendido')`, [faz.id]
-        )
-        const haUsada = (lAtivos||[]).reduce((s,l) => s + l.quantidade / (CAP_SOL[l.fase]||1), 0)
-        if (haUsada + necessarioHa <= faz.tamanho_ha) { fazEscolhida = faz; break }
-      }
+      if (aloc.semEspaco) {
+        // Reverte o status para permitir ao admin recusar ou aguardar.
+        await query(`UPDATE solicitacoes SET status='pendente' WHERE id=$1`, [id])
 
-      const semEspaco    = !fazEscolhida
-      const redirecionado = fazEscolhida && String(fazEscolhida.id) !== String(solic.fazenda_id)
-      const fazendaIdFinal = fazEscolhida?.id || solic.fazenda_id || candidatas[0]?.id || null
-      const fazendaNomeFinal = fazEscolhida?.nome || candidatas[0]?.nome || ''
+        const totalHa = aloc.fazendas.reduce((s, f) => s + Number(f.tamanho_ha || 0), 0)
+        const usadaTotal = Object.values(aloc.ocupacao).reduce((s, o) => s + o.usada, 0)
 
-      if (semEspaco) {
-        // Notifica jogador: todas as fazendas cheias
         await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
-          [solic.jogador_id, '⚠️ Fazendas no limite de capacidade!',
-           `Seus bezerros estão chegando mas todas as fazendas estão no limite. Venda animais ou alugue pasto extra para acomodar o rebanho.`])
-      } else if (redirecionado) {
+          [solic.jogador_id, '⚠️ Fazendas cheias — compra em espera',
+           `Sua compra de ${solic.quantidade} bezerros não pôde ser aprovada: todas as suas fazendas estão no limite (${Math.round(usadaTotal*10)/10}/${totalHa} ha equiv.). Venda animais ou alugue pasto extra para liberar espaço.`])
+
+        return res.status(400).json({
+          error: `Capacidade insuficiente! Jogador tem ${Math.round(usadaTotal*10)/10}/${totalHa} ha equiv. ocupados em ${aloc.fazendas.length} fazenda(s). Precisa de ${aloc.necessarioHa} ha livres.`,
+        })
+      }
+
+      const fazEscolhida     = aloc.fazenda
+      const redirecionado    = aloc.redirecionada
+      const fazendaIdFinal   = fazEscolhida.id
+      const fazendaNomeFinal = fazEscolhida.nome
+
+      if (redirecionado) {
         // Notifica jogador: redirecionado para outra fazenda
         await query(`INSERT INTO notificacoes (jogador_id, titulo, mensagem) VALUES ($1,$2,$3)`,
           [solic.jogador_id, '🔀 Rebanho redirecionado',

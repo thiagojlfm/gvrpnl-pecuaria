@@ -1,11 +1,6 @@
 import { query, queryOne } from '../../../lib/db'
 import { verifyToken, getTokenFromReq } from '../../../lib/auth'
-
-const CAP_POR_HA = { bezerro: 3, garrote: 2, boi: 1, abatido: 1 }
-
-function calcHaUsada(lotes = []) {
-  return (lotes || []).reduce((s, l) => s + (Number(l.quantidade || 0) / (CAP_POR_HA[l.fase] || 1)), 0)
-}
+import { allocateFarm } from '../../../lib/allocate'
 
 export default async function handler(req, res) {
   const token = getTokenFromReq(req)
@@ -89,58 +84,19 @@ export default async function handler(req, res) {
       }
     }
 
-    const { data: fazendasJogador } = await query(
-      `
-      SELECT *
-      FROM fazendas
-      WHERE dono_id = $1
-      ORDER BY CASE WHEN id = $2 THEN 0 ELSE 1 END, tamanho_ha DESC, id ASC
-    `,
-      [jogador_id, fazenda_id || null]
-    )
+    // Auto-alocação: varre todas as fazendas do jogador e escolhe a primeira com espaço.
+    const aloc = await allocateFarm(jogador_id, quantidadeNum, fazenda_id || null, 'bezerro')
 
-    if ((fazendasJogador || []).length > 0) {
-      const ids = fazendasJogador.map(fz => Number(fz.id)).filter(Number.isFinite)
-      const lotesPorFazenda = new Map()
-
-      if (ids.length > 0) {
-        const { data: lotesAtivos } = await query(
-          `
-          SELECT fazenda_id, fase, quantidade
-          FROM lotes
-          WHERE fazenda_id = ANY($1::int[])
-            AND status NOT IN ('pago','vendido')
-        `,
-          [ids]
-        )
-
-        ;(lotesAtivos || []).forEach(l => {
-          const key = String(l.fazenda_id)
-          if (!lotesPorFazenda.has(key)) lotesPorFazenda.set(key, [])
-          lotesPorFazenda.get(key).push(l)
-        })
-      }
-
-      const necessarioHa = quantidadeNum / 3
-      const fazendaComEspaco = fazendasJogador.find(fz => {
-        const usada = calcHaUsada(lotesPorFazenda.get(String(fz.id)))
-        return usada + necessarioHa <= Number(fz.tamanho_ha || 0)
-      })
-
-      if (!fazendaComEspaco) {
-        const capacidadeTotal = fazendasJogador.reduce((s, fz) => s + Number(fz.tamanho_ha || 0), 0)
-        const capacidadeUsada = fazendasJogador.reduce(
-          (s, fz) => s + calcHaUsada(lotesPorFazenda.get(String(fz.id))),
-          0
-        )
-
+    if (aloc.fazendas.length > 0) {
+      if (aloc.semEspaco) {
+        const totalHa = aloc.fazendas.reduce((s, f) => s + Number(f.tamanho_ha || 0), 0)
+        const usadaTotal = Object.values(aloc.ocupacao).reduce((s, o) => s + o.usada, 0)
         return res.status(400).json({
-          error: `Sem capacidade total! Usada: ${Math.round(capacidadeUsada * 10) / 10}/${capacidadeTotal} ha equiv. nas ${fazendasJogador.length} fazenda(s) do jogador.`,
+          error: `Sem capacidade! Ocupado ${Math.round(usadaTotal * 10) / 10}/${totalHa} ha equiv. em ${aloc.fazendas.length} fazenda(s). Precisa de ${aloc.necessarioHa} ha livres para ${quantidadeNum} bezerros.`,
         })
       }
-
-      fazendaIdFinal = fazendaComEspaco.id
-      fazendaNomeFinal = fazendaComEspaco.nome
+      fazendaIdFinal = aloc.fazenda.id
+      fazendaNomeFinal = aloc.fazenda.nome
     }
 
     // Generate unique codigo.

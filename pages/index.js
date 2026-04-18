@@ -57,6 +57,7 @@ export default function App() {
   const [nRacao, setNRacao] = useState({jogador_id:'',kg:'',valor:''})
   const [rebanhoHist, setRebanhoHist] = useState([])
   const [precoHist, setPrecoHist] = useState([])
+  const [rebanhoTab, setRebanhoTab] = useState('all') // 'all' | fazenda_id
 
   function changePage(p) {
     sounds.click()
@@ -513,8 +514,78 @@ export default function App() {
               <p style={{fontSize:13,color:T.textMuted,marginBottom:20}}>Vá até a aba Comprar para iniciar seu rebanho</p>
               <Btn onClick={()=>changePage('comprar')} T={T}>Comprar bezerros →</Btn>
             </Card>:
-            <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              {meusLotes.map(l=>{
+            (()=>{
+              // Agrupa lotes ativos por fazenda_id p/ construir os separadores.
+              const lotesVisiveis = meusLotes.filter(l=>!['pago','vendido'].includes(l.status))
+              const CAP_FASE = {bezerro:3,garrote:2,boi:1,abatido:1}
+              const haUsada = arr => arr.reduce((s,l)=>s + l.quantidade/(CAP_FASE[l.fase]||1), 0)
+              // Só mostra fazendas do jogador (com ou sem lotes) + uma aba "Todas".
+              const fazendasTabs = (minhasFazendas||[])
+                .slice()
+                .sort((a,b)=>Number(a.id)-Number(b.id))
+                .map(f => {
+                  const lotesDestaFaz = lotesVisiveis.filter(l => String(l.fazenda_id) === String(f.id))
+                  const cab = lotesDestaFaz.reduce((s,l)=>s+l.quantidade,0)
+                  const usada = haUsada(lotesDestaFaz)
+                  const total = Number(f.tamanho_ha || 0)
+                  return { id: String(f.id), nome: f.nome, cab, usada, total, lotes: lotesDestaFaz }
+                })
+              // Lotes órfãos (fazenda_id nulo ou apagada) — vão pro bucket "Sem fazenda".
+              const orfaos = lotesVisiveis.filter(l => !fazendasTabs.some(t => t.id === String(l.fazenda_id)))
+              if (orfaos.length > 0) {
+                fazendasTabs.push({ id: '__orfaos__', nome: 'Sem fazenda', cab: orfaos.reduce((s,l)=>s+l.quantidade,0), usada: haUsada(orfaos), total: 0, lotes: orfaos })
+              }
+              const tabs = [
+                { id: 'all', nome: 'Todas', cab: lotesVisiveis.reduce((s,l)=>s+l.quantidade,0), usada: haUsada(lotesVisiveis), total: fazendasTabs.reduce((s,t)=>s + (t.id==='__orfaos__'?0:t.total), 0), lotes: lotesVisiveis },
+                ...fazendasTabs,
+              ]
+              const abaValida = tabs.find(t => t.id === rebanhoTab) || tabs[0]
+              const lotesDaAba = abaValida.lotes
+
+              return <>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14,borderBottom:`1px solid ${T.border}`,paddingBottom:10}}>
+                  {tabs.map(t=>{
+                    const active = t.id === abaValida.id
+                    const pct = t.total>0 ? Math.min(100, Math.round((t.usada/t.total)*100)) : 0
+                    const cor = pct>90?'#f87171':pct>70?T.gold:T.green
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={()=>{sounds.click();setRebanhoTab(t.id)}}
+                        style={{
+                          background: active ? T.inputBg : 'transparent',
+                          border: `1px solid ${active ? T.gold : T.border}`,
+                          borderRadius: 10,
+                          padding: '8px 14px',
+                          cursor: 'pointer',
+                          color: active ? T.text : T.textMuted,
+                          display:'flex', flexDirection:'column', gap:2, alignItems:'flex-start',
+                          transition:'all .15s',
+                          minWidth: 110,
+                        }}
+                      >
+                        <span style={{fontSize:12,fontWeight:700,fontFamily:"'Playfair Display',serif",color:active?T.text:T.textMuted}}>
+                          {t.id==='all'?'🐄 ':t.id==='__orfaos__'?'❓ ':'🏡 '}{t.nome}
+                        </span>
+                        <span style={{fontSize:10,color:T.textMuted,fontFamily:'var(--font-data)'}}>
+                          {t.cab} cab · {t.total>0 ? `${Math.round(t.usada*10)/10}/${t.total} ha` : '—'}
+                        </span>
+                        {t.total>0 && (
+                          <div style={{width:'100%',height:3,background:T.border,borderRadius:2,overflow:'hidden',marginTop:2}}>
+                            <div style={{width:`${pct}%`,height:'100%',background:cor,transition:'width .3s'}}/>
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                {lotesDaAba.length===0
+                  ? <Card T={T} hover={false} style={{textAlign:'center',padding:32}}>
+                      <div style={{fontSize:36,marginBottom:10}}>📭</div>
+                      <div style={{fontSize:13,color:T.textMuted}}>Nenhum lote nesta fazenda.</div>
+                    </Card>
+                  : <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                      {lotesDaAba.map(l=>{
                 const cons = ({bezerro:3,garrote:5,boi:8,abatido:0}[l.fase]||0)*l.quantidade
                 return <Card key={l.id} T={T} style={{padding:0,overflow:'hidden'}} hover={false}>
                   <div style={{display:'flex',alignItems:'stretch',flexWrap:'wrap'}}>
@@ -550,8 +621,11 @@ export default function App() {
                     </div>
                   </div>
                 </Card>
-              })}
-            </div>}
+                      })}
+                    </div>
+                }
+              </>
+            })()}
           </>}
 
           {/* VENDA */}
